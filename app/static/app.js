@@ -129,8 +129,11 @@ async function refreshLongWork(){
   workPollBusy=true;
   try{
     const task=await api('/api/work/current');
-    if(task){workStatusReceivedAt=Date.now();renderLongWork(task)}
-    else renderLongWork(null);
+    if(task){
+      const changed=!activeWorkTask||activeWorkTask.status!==task.status||Number(activeWorkTask.remaining_seconds)!==Number(task.remaining_seconds);
+      if(changed)workStatusReceivedAt=Date.now();
+      renderLongWork(task);
+    }else renderLongWork(null);
   }catch(error){console.warn('Não foi possível atualizar a tarefa:',error.message)}
   finally{workPollBusy=false}
 }
