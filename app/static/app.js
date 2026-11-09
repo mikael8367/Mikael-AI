@@ -5,7 +5,7 @@ let selectedModel="mikael";
 const $=id=>document.getElementById(id);
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
 async function api(url,opts={}){const res=await fetch(url,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})},credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.detail||'Erro na solicitação');return data}
-function showTab(tab){const page=$('tab-'+tab);if(!page)return;document.querySelectorAll('.tab-page').forEach(x=>x.classList.remove('active'));page.classList.add('active');document.querySelectorAll('.nav-item').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false')});if(tab==='files')loadFiles();if(tab==='settings')loadMemories();if(tab==='chat')loadConversations()}
+function showTab(tab){const page=$('tab-'+tab);if(!page)return;document.querySelectorAll('.tab-page').forEach(x=>x.classList.remove('active'));page.classList.add('active');document.querySelectorAll('.nav-item').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false')});if(tab==='files')loadFiles();if(tab==='settings'){loadMemories();loadConnectors();}if(tab==='chat')loadConversations()}
 function bubble(role,text){const el=document.createElement('div');el.className='bubble '+role;el.textContent=text;$('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;return el}
 function resetChat(){conversationId=null;$('messages').innerHTML='<div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div>'}
 async function newConversation(){try{const c=await api('/api/conversations',{method:'POST'});conversationId=c.id;resetChat();conversationId=c.id;await loadConversations();toast('Nova conversa criada')}catch(e){toast('Não foi possível criar a conversa: '+e.message)}}
@@ -15,12 +15,46 @@ async function send(){const input=$('prompt');const text=input.value.trim();if(!
 async function loadFiles(){try{const rows=await api('/api/files');$('fileList').innerHTML='';if(!rows.length){$('fileList').textContent='Nenhum arquivo enviado ainda.';return}rows.forEach(f=>{const el=document.createElement('div');el.className='list-item file-item';if(f.is_image){const img=document.createElement('img');img.className='file-thumb';img.alt='Prévia de '+f.filename;img.loading='lazy';img.src='/api/files/'+f.id+'/preview';el.append(img)}const info=document.createElement('div');info.className='file-info';const title=document.createElement('span');title.textContent=(f.is_image?'Foto · ':'')+f.filename+' · '+f.characters+' caracteres';info.append(title);const actions=document.createElement('div');actions.className='file-actions';const download=document.createElement('button');download.textContent='Baixar';download.onclick=()=>{location.href='/api/files/'+f.id+'/download'};const b=document.createElement('button');b.textContent=f.is_image?'Analisar foto':'Analisar';b.onclick=async()=>{b.disabled=true;b.textContent='Analisando...';try{const r=await api('/api/files/'+f.id+'/analyze',{method:'POST'});showTab('chat');resetChat();bubble('assistant',r.analysis)}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=f.is_image?'Analisar foto':'Analisar'}};actions.append(download,b);el.append(info,actions);$('fileList').append(el)})}catch(e){toast(e.message)}}
 async function generateFile(){const filename=$('newFileName').value.trim();const description=$('newFileDescription').value.trim();if(!filename||!description){toast('Informe o nome e descreva o arquivo.');return}const button=$('generateFile');button.disabled=true;button.textContent='Gerando...';try{const result=await api('/api/files/generate',{method:'POST',body:JSON.stringify({filename,description})});$('newFileName').value='';$('newFileDescription').value='';toast('Arquivo criado: '+result.filename);await loadFiles()}catch(e){toast(e.message)}finally{button.disabled=false;button.textContent='Gerar arquivo'}}
 async function loadMemories(){const list=$('memoryList');try{const rows=await api('/api/memories');list.innerHTML='';if(!rows.length){list.textContent='Nenhuma memória salva ainda.';return}rows.forEach(m=>{const el=document.createElement('div');el.className='list-item';const t=document.createElement('span');t.textContent=m.content;const b=document.createElement('button');b.type='button';b.textContent='Excluir';b.onclick=async()=>{b.disabled=true;try{await api('/api/memories/'+m.id,{method:'DELETE'});await loadMemories();toast('Memória excluída')}catch(e){toast('Não foi possível excluir: '+e.message);b.disabled=false}};el.append(t,b);list.append(el)})}catch(e){list.textContent='Não foi possível carregar as memórias.';toast(e.message)}}
-async function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels()}catch{$('login').classList.remove('hidden')}}
+async function loadConnectors(){
+  const list=$('connectorList');
+  try{
+    const rows=await api('/api/connectors');
+    list.innerHTML='';
+    const github=rows.find(x=>x.provider==='github');
+    $('githubStatus').textContent=github?'Conectado como @'+github.account:'Ainda não há uma conta GitHub conectada.';
+    if(!rows.length){list.textContent='Nenhum conector conectado.';return}
+    rows.forEach(item=>{
+      const card=document.createElement('div');card.className='list-item connector-item';
+      const info=document.createElement('div');info.className='connector-info';
+      const name=document.createElement('b');name.textContent=item.name;
+      const detail=document.createElement('small');detail.textContent=(item.provider==='github'?'GitHub · @'+item.account:'MCP · '+(item.account||item.endpoint));
+      info.append(name,detail);
+      const actions=document.createElement('div');actions.className='connector-actions';
+      const test=document.createElement('button');test.type='button';test.textContent='Testar';
+      test.onclick=async()=>{test.disabled=true;test.textContent='Testando...';try{const result=await api('/api/connectors/'+item.id+'/test',{method:'POST'});toast('Conexão válida · '+(result.account||'OK'))}catch(e){toast('Falha no teste: '+e.message)}finally{test.disabled=false;test.textContent='Testar'}};
+      const remove=document.createElement('button');remove.type='button';remove.textContent='Desconectar';
+      remove.onclick=async()=>{if(!confirm('Desconectar '+item.name+'? A Mikael AI perderá o acesso por este conector.'))return;remove.disabled=true;try{await api('/api/connectors/'+item.id,{method:'DELETE'});await loadConnectors();toast('Conector desconectado')}catch(e){toast(e.message);remove.disabled=false}};
+      actions.append(test,remove);card.append(info,actions);list.append(card);
+    });
+  }catch(e){list.textContent='Não foi possível carregar os conectores.';toast(e.message)}
+}
+async function addMcpConnector(){
+  const name=$('mcpName').value.trim(),endpoint=$('mcpEndpoint').value.trim(),token=$('mcpToken').value;
+  if(name.length<2||!endpoint){toast('Informe um nome e o endereço HTTPS do servidor MCP.');return}
+  const button=$('addMcp');button.disabled=true;button.textContent='Testando servidor...';
+  try{
+    const result=await api('/api/connectors/mcp',{method:'POST',body:JSON.stringify({name,endpoint,token})});
+    $('mcpToken').value='';$('mcpName').value='';$('mcpEndpoint').value='';
+    await loadConnectors();toast('MCP conectado · '+(result.tools||[]).length+' ferramenta(s) encontrada(s).');
+  }catch(e){toast('Não foi possível conectar: '+e.message)}
+  finally{button.disabled=false;button.textContent='Testar e adicionar MCP'}
+}
+async function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels();const params=new URLSearchParams(location.search);if(params.get('connector')==='github_connected'){toast('GitHub conectado com sucesso!');showTab('settings')}else if(params.has('connector_error')){toast('Não foi possível conectar o GitHub. Confira a configuração OAuth.');showTab('settings')}if(params.has('connector')||params.has('connector_error'))history.replaceState({},'',location.pathname)}catch{$('login').classList.remove('hidden')}}
 async function loadModels(){try{const models=await api('/api/models');const select=$('modelSelect');if(!Array.isArray(models)||!models.some(m=>m.id==='mikael'))throw new Error('Lista de modelos inválida.');select.innerHTML='';models.forEach(model=>{const option=document.createElement('option');option.value=model.id;option.textContent=model.name;option.title=model.description||'';select.append(option)});if(!models.some(m=>m.id===selectedModel))selectedModel='mikael';select.value=selectedModel}catch(error){toast('Não foi possível carregar os modelos: '+error.message)}}
 $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael','deepseek','gpt4o_mini'].includes(value)){selectedModel='mikael';$('modelSelect').value='mikael';return}selectedModel=value;try{localStorage.setItem('mikael_selected_model',value)}catch{}toast('Modelo selecionado: '+$('modelSelect').selectedOptions[0].textContent)};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
-$('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
+$('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};\n$('addMcp').onclick=addMcpConnector;\n$('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 async function generateChatImage(){
   const input=$('prompt');
