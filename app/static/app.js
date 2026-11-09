@@ -2,8 +2,51 @@ let conversationId=null;
 let isSending=false;
 let isGeneratingImage=false;
 let selectedModel="mikael";
+let approvalResolver=null;
+let pendingQueue=Promise.resolve();
 const $=id=>document.getElementById(id);
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+function confirmInApp(title,description,allowLabel='Permitir',denyLabel='Negar'){
+  return new Promise(resolve=>{
+    if(approvalResolver)approvalResolver(false);
+    approvalResolver=resolve;
+    $('approvalTitle').textContent=title;
+    $('approvalDescription').textContent=description;
+    $('approvalAllow').textContent=allowLabel;
+    $('approvalDeny').textContent=denyLabel;
+    $('approvalModal').classList.remove('hidden');
+    $('approvalAllow').focus();
+  });
+}
+function closeApproval(allowed){
+  if(!approvalResolver)return;
+  const resolve=approvalResolver;approvalResolver=null;
+  $('approvalModal').classList.add('hidden');
+  resolve(Boolean(allowed));
+}
+async function handlePendingApproval(action){
+  const approved=await confirmInApp(action.title||'Excluir arquivo?',action.description||'A Mikael AI solicitou uma exclusão no GitHub.','Permitir exclusão','Negar');
+  try{
+    if(approved){
+      const result=await api('/api/actions/'+Number(action.id)+'/approve',{method:'POST'});
+      toast(result.message||'Ação aprovada e concluída.');
+    }else{
+      await api('/api/actions/'+Number(action.id)+'/deny',{method:'POST'});
+      toast('Exclusão negada. Nada foi apagado.');
+    }
+  }catch(error){toast('Não foi possível resolver a solicitação: '+error.message)}
+}
+function queuePendingApprovals(actions){
+  if(!Array.isArray(actions)||!actions.length)return;
+  pendingQueue=pendingQueue.then(async()=>{
+    for(const action of actions){
+      if(Number.isInteger(Number(action.id)))await handlePendingApproval(action);
+    }
+  }).catch(error=>toast(error.message));
+}
+async function loadPendingApprovals(){
+  try{const actions=await api('/api/actions/pending');queuePendingApprovals(actions)}catch(error){toast('Não foi possível verificar ações pendentes: '+error.message)}
+}
 async function api(url,opts={}){const res=await fetch(url,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})},credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.detail||'Erro na solicitação');return data}
 function showTab(tab){const page=$('tab-'+tab);if(!page)return;document.querySelectorAll('.tab-page').forEach(x=>x.classList.remove('active'));page.classList.add('active');document.querySelectorAll('.nav-item').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false')});if(tab==='files')loadFiles();if(tab==='settings'){loadMemories();loadConnectors();}if(tab==='chat')loadConversations()}
 function bubble(role,text){const el=document.createElement('div');el.className='bubble '+role;el.textContent=text;$('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;return el}
@@ -11,10 +54,10 @@ function resetChat(){conversationId=null;$('messages').innerHTML='<div class="we
 async function newConversation(){try{const c=await api('/api/conversations',{method:'POST'});conversationId=c.id;resetChat();conversationId=c.id;await loadConversations();toast('Nova conversa criada')}catch(e){toast('Não foi possível criar a conversa: '+e.message)}}
 async function loadConversations(){const list=$('conversationList');try{const rows=await api('/api/conversations');list.innerHTML='';if(!rows.length){list.textContent='Nenhuma conversa criada ainda.';return}rows.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='list-item conversation-item'+(Number(c.id)===Number(conversationId)?' selected':'');b.textContent=c.title||'Nova conversa';b.setAttribute('aria-label','Abrir conversa '+(c.title||c.id));b.setAttribute('aria-current',Number(c.id)===Number(conversationId)?'true':'false');b.onclick=()=>openConversation(Number(c.id));list.append(b)})}catch(e){list.textContent='Não foi possível carregar o histórico.';toast(e.message)}}
 async function openConversation(id){if(!Number.isInteger(Number(id))||Number(id)<1){toast('Identificador de conversa inválido.');return}showTab('chat');conversationId=Number(id);const messages=$('messages');messages.innerHTML='<div class="welcome-msg">Abrindo conversa...</div>';try{const c=await api('/api/conversations/'+Number(id));if(!c||Number(c.id)!==Number(id)||!Array.isArray(c.messages))throw new Error('O servidor retornou uma conversa inválida.');conversationId=c.id;messages.innerHTML='';if(!c.messages.length){messages.innerHTML='<div class="welcome-msg">Conversa vazia. Envie sua primeira mensagem.</div>'}else{c.messages.forEach(m=>bubble(m.role==='assistant'?'assistant':'user',String(m.content??'')))}await loadConversations();messages.scrollTop=messages.scrollHeight}catch(e){conversationId=null;messages.innerHTML='<div class="welcome-msg">Não foi possível abrir esta conversa. Tente novamente.</div>';toast('Não foi possível abrir a conversa: '+e.message)}}
-async function send(){const input=$('prompt');const text=input.value.trim();if(!text||isSending)return;isSending=true;input.value='';input.disabled=true;$('sendBtn').disabled=true;if($('messages').querySelector('.welcome-msg'))$('messages').innerHTML='';bubble('user',text);const wait=bubble('assistant','Mikael AI está analisando...');try{const d=await api('/api/chat',{method:'POST',body:JSON.stringify({message:text,conversation_id:conversationId,model_id:selectedModel})});conversationId=d.conversation_id;wait.textContent=d.reply||'A IA não retornou uma resposta.';await loadConversations()}catch(e){wait.textContent='Erro: '+e.message;toast(e.message)}finally{isSending=false;input.disabled=false;$('sendBtn').disabled=false;input.focus()}}
+async function send(){const input=$('prompt');const text=input.value.trim();if(!text||isSending)return;isSending=true;input.value='';input.disabled=true;$('sendBtn').disabled=true;if($('messages').querySelector('.welcome-msg'))$('messages').innerHTML='';bubble('user',text);const wait=bubble('assistant','Mikael AI está analisando...');try{const d=await api('/api/chat',{method:'POST',body:JSON.stringify({message:text,conversation_id:conversationId,model_id:selectedModel})});conversationId=d.conversation_id;wait.textContent=d.reply||'A IA não retornou uma resposta.';queuePendingApprovals(d.pending_actions||[]);await loadConversations()}catch(e){wait.textContent='Erro: '+e.message;toast(e.message)}finally{isSending=false;input.disabled=false;$('sendBtn').disabled=false;input.focus()}}
 async function loadFiles(){try{const rows=await api('/api/files');$('fileList').innerHTML='';if(!rows.length){$('fileList').textContent='Nenhum arquivo enviado ainda.';return}rows.forEach(f=>{const el=document.createElement('div');el.className='list-item file-item';if(f.is_image){const img=document.createElement('img');img.className='file-thumb';img.alt='Prévia de '+f.filename;img.loading='lazy';img.src='/api/files/'+f.id+'/preview';el.append(img)}const info=document.createElement('div');info.className='file-info';const title=document.createElement('span');title.textContent=(f.is_image?'Foto · ':'')+f.filename+' · '+f.characters+' caracteres';info.append(title);const actions=document.createElement('div');actions.className='file-actions';const download=document.createElement('button');download.textContent='Baixar';download.onclick=()=>{location.href='/api/files/'+f.id+'/download'};const b=document.createElement('button');b.textContent=f.is_image?'Analisar foto':'Analisar';b.onclick=async()=>{b.disabled=true;b.textContent='Analisando...';try{const r=await api('/api/files/'+f.id+'/analyze',{method:'POST'});showTab('chat');resetChat();bubble('assistant',r.analysis)}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=f.is_image?'Analisar foto':'Analisar'}};actions.append(download,b);el.append(info,actions);$('fileList').append(el)})}catch(e){toast(e.message)}}
 async function generateFile(){const filename=$('newFileName').value.trim();const description=$('newFileDescription').value.trim();if(!filename||!description){toast('Informe o nome e descreva o arquivo.');return}const button=$('generateFile');button.disabled=true;button.textContent='Gerando...';try{const result=await api('/api/files/generate',{method:'POST',body:JSON.stringify({filename,description})});$('newFileName').value='';$('newFileDescription').value='';toast('Arquivo criado: '+result.filename);await loadFiles()}catch(e){toast(e.message)}finally{button.disabled=false;button.textContent='Gerar arquivo'}}
-async function loadMemories(){const list=$('memoryList');try{const rows=await api('/api/memories');list.innerHTML='';if(!rows.length){list.textContent='Nenhuma memória salva ainda.';return}rows.forEach(m=>{const el=document.createElement('div');el.className='list-item';const t=document.createElement('span');t.textContent=m.content;const b=document.createElement('button');b.type='button';b.textContent='Excluir';b.onclick=async()=>{b.disabled=true;try{await api('/api/memories/'+m.id,{method:'DELETE'});await loadMemories();toast('Memória excluída')}catch(e){toast('Não foi possível excluir: '+e.message);b.disabled=false}};el.append(t,b);list.append(el)})}catch(e){list.textContent='Não foi possível carregar as memórias.';toast(e.message)}}
+async function loadMemories(){const list=$('memoryList');try{const rows=await api('/api/memories');list.innerHTML='';if(!rows.length){list.textContent='Nenhuma memória salva ainda.';return}rows.forEach(m=>{const el=document.createElement('div');el.className='list-item';const t=document.createElement('span');t.textContent=m.content;const b=document.createElement('button');b.type='button';b.textContent='Excluir';b.onclick=async()=>{const allowed=await confirmInApp('Excluir esta memória?',m.content,'Excluir memória','Manter');if(!allowed)return;b.disabled=true;try{await api('/api/memories/'+m.id,{method:'DELETE'});await loadMemories();toast('Memória excluída')}catch(e){toast('Não foi possível excluir: '+e.message);b.disabled=false}};el.append(t,b);list.append(el)})}catch(e){list.textContent='Não foi possível carregar as memórias.';toast(e.message)}}
 async function loadConnectors(){
   const list=$('connectorList');
   try{
@@ -33,7 +76,7 @@ async function loadConnectors(){
       const test=document.createElement('button');test.type='button';test.textContent='Testar';
       test.onclick=async()=>{test.disabled=true;test.textContent='Testando...';try{const result=await api('/api/connectors/'+item.id+'/test',{method:'POST'});toast('Conexão válida · '+(result.account||'OK'))}catch(e){toast('Falha no teste: '+e.message)}finally{test.disabled=false;test.textContent='Testar'}};
       const remove=document.createElement('button');remove.type='button';remove.textContent='Desconectar';
-      remove.onclick=async()=>{if(!confirm('Desconectar '+item.name+'? A Mikael AI perderá o acesso por este conector.'))return;remove.disabled=true;try{await api('/api/connectors/'+item.id,{method:'DELETE'});await loadConnectors();toast('Conector desconectado')}catch(e){toast(e.message);remove.disabled=false}};
+      remove.onclick=async()=>{const allowed=await confirmInApp('Desconectar conector?',item.name+' · '+(item.provider==='github'?'A Mikael AI perderá o acesso à sua conta GitHub.':'A Mikael AI perderá o acesso a este servidor MCP.'),'Desconectar','Cancelar');if(!allowed)return;remove.disabled=true;try{await api('/api/connectors/'+item.id,{method:'DELETE'});await loadConnectors();toast('Conector desconectado')}catch(e){toast(e.message);remove.disabled=false}};
       actions.append(test,remove);card.append(info,actions);list.append(card);
     });
   }catch(e){list.textContent='Não foi possível carregar os conectores.';toast(e.message)}
@@ -49,8 +92,12 @@ async function addMcpConnector(){
   }catch(e){toast('Não foi possível conectar: '+e.message)}
   finally{button.disabled=false;button.textContent='Testar e adicionar MCP'}
 }
-async function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels();const params=new URLSearchParams(location.search);if(params.get('connector')==='github_connected'){toast('GitHub conectado com sucesso!');showTab('settings')}else if(params.has('connector_error')){toast('Não foi possível conectar o GitHub. Confira a configuração OAuth.');showTab('settings')}if(params.has('connector')||params.has('connector_error'))history.replaceState({},'',location.pathname)}catch{$('login').classList.remove('hidden')}}
+async function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels();await loadPendingApprovals();const params=new URLSearchParams(location.search);if(params.get('connector')==='github_connected'){toast('GitHub conectado com sucesso!');showTab('settings')}else if(params.has('connector_error')){toast('Não foi possível conectar o GitHub. Confira a configuração OAuth.');showTab('settings')}if(params.has('connector')||params.has('connector_error'))history.replaceState({},'',location.pathname)}catch{$('login').classList.remove('hidden')}}
 async function loadModels(){try{const models=await api('/api/models');const select=$('modelSelect');if(!Array.isArray(models)||!models.some(m=>m.id==='mikael'))throw new Error('Lista de modelos inválida.');select.innerHTML='';models.forEach(model=>{const option=document.createElement('option');option.value=model.id;option.textContent=model.name;option.title=model.description||'';select.append(option)});if(!models.some(m=>m.id===selectedModel))selectedModel='mikael';select.value=selectedModel}catch(error){toast('Não foi possível carregar os modelos: '+error.message)}}
+$('approvalAllow').onclick=()=>closeApproval(true);
+$('approvalDeny').onclick=()=>closeApproval(false);
+$('approvalModal').addEventListener('click',event=>{if(event.target===$('approvalModal'))closeApproval(false)});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('approvalModal').classList.contains('hidden'))closeApproval(false)});
 $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael','deepseek','gpt4o_mini'].includes(value)){selectedModel='mikael';$('modelSelect').value='mikael';return}selectedModel=value;try{localStorage.setItem('mikael_selected_model',value)}catch{}toast('Modelo selecionado: '+$('modelSelect').selectedOptions[0].textContent)};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
