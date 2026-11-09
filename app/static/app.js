@@ -1,5 +1,6 @@
 let conversationId=null;
-let isSending=false;\nlet isGeneratingImage=false;
+let isSending=false;
+let isGeneratingImage=false;
 const $=id=>document.getElementById(id);
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
 async function api(url,opts={}){const res=await fetch(url,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})},credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.detail||'Erro na solicitação');return data}
@@ -91,7 +92,8 @@ async function handleChatFiles(event){
   await loadFiles();
 }
 $('sendBtn').onclick=send;$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
-$('attachBtn').onclick=()=>{if(!isSending&&!isGeneratingImage)$('chatFileInput').click()};\n$('imageGenBtn').onclick=generateChatImage;
+$('attachBtn').onclick=()=>{if(!isSending&&!isGeneratingImage)$('chatFileInput').click()};
+$('imageGenBtn').onclick=generateChatImage;
 $('chatFileInput').onchange=handleChatFiles;
 $('newChat').onclick=newConversation;$('startChat').onclick=()=>{showTab('chat');newConversation();$('prompt').focus()};
 document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{showTab('chat');resetChat();$('prompt').value=b.dataset.prompt;$('prompt').focus()});
