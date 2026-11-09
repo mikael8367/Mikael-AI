@@ -1,9 +1,13 @@
 import os
+import json
+import time
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from fastapi import HTTPException
 
-from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema
-from app.models import PendingAction
+from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool
+from app.models import PendingAction, Connector
 
 
 class ConnectorSecurityTests(unittest.TestCase):
@@ -29,6 +33,57 @@ class ConnectorSecurityTests(unittest.TestCase):
     def test_rejects_local_mcp_host(self):
         with self.assertRaises(HTTPException):
             validate_mcp_endpoint("https://localhost/mcp")
+
+    def test_github_delete_creates_pending_request_without_deleting(self):
+        github = SimpleNamespace(secret=encrypt_secret("github-test-token"))
+
+        class FakeQuery:
+            def __init__(self, first=None, count=0):
+                self.first_value = first
+                self.count_value = count
+            def filter_by(self, **kwargs):
+                return self
+            def filter(self, *args):
+                return self
+            def first(self):
+                return self.first_value
+            def count(self):
+                return self.count_value
+
+        class FakeDB:
+            def __init__(self):
+                self.action = None
+            def query(self, model):
+                if model is Connector:
+                    return FakeQuery(first=github)
+                if model is PendingAction:
+                    return FakeQuery(count=0)
+                raise AssertionError("Modelo inesperado")
+            def add(self, action):
+                self.action = action
+            def commit(self):
+                pass
+            def refresh(self, action):
+                action.id = 123
+
+        db = FakeDB()
+        with patch("app.connectors._http_json", return_value={
+            "type": "file", "sha": "blob-sha-123", "path": "src/old.py"
+        }) as request:
+            result = execute_connector_tool("github_delete_file", {
+                "owner": "mikael8367", "repo": "Mikael-AI",
+                "path": "src/old.py", "message": "Remove obsolete file",
+                "_conversation_id": 7
+            }, db)
+
+        self.assertTrue(result["approval_required"])
+        self.assertEqual(result["action_id"], 123)
+        self.assertEqual(db.action.status, "pending")
+        self.assertEqual(db.action.conversation_id, 7)
+        self.assertGreater(db.action.expires_at, int(time.time()))
+        self.assertEqual(json.loads(db.action.arguments)["sha"], "blob-sha-123")
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_args.kwargs.get("method", "GET"), "GET")
 
     def test_pending_action_model_has_expiration_and_single_use_status(self):
         self.assertEqual(PendingAction.__tablename__, "pending_actions")
