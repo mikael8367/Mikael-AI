@@ -1,4 +1,4 @@
-import os, re, logging, mimetypes
+import os, re, logging, mimetypes, time
 from pathlib import Path
 from io import BytesIO
 
@@ -12,12 +12,12 @@ from pypdf import PdfReader
 from docx import Document
 
 from .db import Base, engine, get_db
-from .models import Conversation, Message, Memory, UploadedFile, Connector
+from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
-from .connectors import (encrypt_secret, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
+from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.10.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -242,6 +242,75 @@ def disconnect_connector(connector_id: int, _: None = Depends(require_auth), db:
     return {"ok": True}
 
 
+@app.get("/api/actions/pending")
+def list_pending_actions(_: None = Depends(require_auth), db: Session = Depends(get_db)):
+    now = int(time.time())
+    rows = db.scalars(
+        select(PendingAction).where(PendingAction.status == "pending", PendingAction.expires_at > now)
+        .order_by(PendingAction.id.asc()).limit(20)
+    ).all()
+    return [{
+        "id": item.id, "title": item.title, "description": item.description,
+        "expires_at": item.expires_at
+    } for item in rows]
+
+
+@app.post("/api/actions/{action_id}/approve")
+def approve_action(action_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    action = db.get(PendingAction, action_id)
+    if not action:
+        raise HTTPException(404, "Solicitação de exclusão não encontrada.")
+    if action.status != "pending":
+        raise HTTPException(409, "Esta solicitação já foi resolvida.")
+    if action.expires_at <= int(time.time()):
+        action.status = "expired"
+        db.commit()
+        raise HTTPException(410, "A solicitação expirou. Peça à Mikael AI para criar outra.")
+    if action.tool_name != "github_delete_file":
+        raise HTTPException(400, "Tipo de ação não permitido.")
+    try:
+        args = json.loads(action.arguments)
+        connector = db.scalars(select(Connector).where(Connector.provider == "github")).first()
+        if not connector:
+            raise HTTPException(409, "GitHub foi desconectado. Conecte novamente antes de aprovar.")
+        token = decrypt_secret(connector.secret)
+        base = "https://api.github.com/repos/%s/%s/contents/%s" % (
+            __import__("urllib.parse", fromlist=["quote"]).quote(args["owner"], safe=""),
+            __import__("urllib.parse", fromlist=["quote"]).quote(args["repo"], safe=""),
+            __import__("urllib.parse", fromlist=["quote"]).quote(args["path"], safe="/")
+        )
+        query = __import__("urllib.parse", fromlist=["urlencode"]).urlencode({"ref": args["branch"]}) if args.get("branch") else ""
+        current = _http_json(base + (("?" + query) if query else ""), token)
+        if not isinstance(current, dict) or current.get("sha") != args.get("sha"):
+            action.status = "stale"
+            db.commit()
+            raise HTTPException(409, "O arquivo mudou desde a confirmação. A exclusão foi cancelada; solicite uma nova confirmação.")
+        result = _http_json(base, token, method="DELETE", payload={
+            "message": args["message"], "sha": args["sha"],
+            **({"branch": args["branch"]} if args.get("branch") else {})
+        })
+        action.status = "approved"
+        db.commit()
+        return {"ok": True, "message": "Arquivo excluído após sua aprovação.", "commit": (result.get("commit") or {}).get("html_url")}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.warning("Falha ao executar exclusão aprovada (%s)", type(exc).__name__)
+        raise HTTPException(502, "O GitHub não conseguiu concluir a exclusão. Nada foi confirmado como concluído; confira o repositório.")
+
+
+@app.post("/api/actions/{action_id}/deny")
+def deny_action(action_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    action = db.get(PendingAction, action_id)
+    if not action:
+        raise HTTPException(404, "Solicitação de exclusão não encontrada.")
+    if action.status != "pending":
+        raise HTTPException(409, "Esta solicitação já foi resolvida.")
+    action.status = "denied"
+    db.commit()
+    return {"ok": True, "message": "Exclusão negada. Nenhum arquivo foi apagado."}
+
+
 @app.post("/api/chat")
 def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
     c = db.get(Conversation, body.conversation_id) if body.conversation_id else None
@@ -284,7 +353,7 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.add(Message(conversation_id=c.id, role="user", content=body.message))
     db.commit()
     try:
-        result = answer(context, model_id=body.model_id, external_tools=connector_tools(db), tool_executor=lambda name, args: execute_connector_tool(name, args, db))
+        result = answer(context, model_id=body.model_id, external_tools=connector_tools(db), tool_executor=lambda name, args: execute_connector_tool(name, {**args, "_conversation_id": c.id}, db))
     except HTTPException:
         raise
     except Exception as exc:
@@ -295,7 +364,19 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
         raise HTTPException(502, "Falha ao consultar o provedor de IA. Consulte os logs do Render para identificar a causa.")
     db.add(Message(conversation_id=c.id, role="assistant", content=result))
     db.commit()
-    return {"conversation_id": c.id, "reply": result}
+    now = int(time.time())
+    pending = db.scalars(select(PendingAction).where(
+        PendingAction.conversation_id == c.id,
+        PendingAction.status == "pending",
+        PendingAction.expires_at > now
+    ).order_by(PendingAction.id.asc()).limit(10)).all()
+    return {
+        "conversation_id": c.id, "reply": result,
+        "pending_actions": [{
+            "id": item.id, "title": item.title, "description": item.description,
+            "expires_at": item.expires_at
+        } for item in pending]
+    }
 
 
 @app.get("/api/memories")
