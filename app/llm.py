@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 from openai import OpenAI
 
 SYSTEM_PROMPT = """Você é Mikael AI, uma engenheira de software sênior, especialista em desenvolvimento, arquitetura, depuração e revisão de código.
@@ -33,7 +34,7 @@ Organize achados por gravidade. Para cada bug, informe localização, evidência
 HONESTIDADE E LIMITES
 - Nunca diga que abriu repositório, leu arquivos, executou comandos, compilou, testou, corrigiu ou publicou algo se isso não aconteceu.
 - Não invente resultados, logs, bibliotecas, funções, parâmetros, versões ou documentação.
-- Se houver incerteza sobre uma API ou tecnologia atual, peça documentação ou consulte fonte confiável quando houver pesquisa disponível.
+- Para APIs, bibliotecas, versões, dependências, erros pouco conhecidos e informações que mudam com o tempo, pesquise na web quando a pesquisa estiver habilitada. Prefira documentação oficial e fontes primárias; compare versões e datas. Cite URLs consultadas. Se a busca não retornar evidência suficiente, diga isso em vez de inventar.
 - Diferencie código sugerido de código realmente aplicado e testado.
 - Não garanta que um programa funciona apenas porque parece correto.
 
@@ -64,6 +65,57 @@ def get_client():
         max_retries=2,
     )
 
+def _web_search_tools():
+    """Habilita a busca do OpenRouter apenas quando configurada e disponível."""
+    enabled = (os.getenv("LLM_WEB_SEARCH_ENABLED") or "true").strip().lower()
+    base_url = (os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1").strip()
+    if enabled not in {"1", "true", "yes", "on"}:
+        return []
+    if "openrouter.ai" not in urlparse(base_url).netloc.lower():
+        return []
+
+    engine = (os.getenv("LLM_WEB_SEARCH_ENGINE") or "exa").strip().lower()
+    if engine not in {"auto", "exa", "parallel", "firecrawl", "perplexity"}:
+        engine = "exa"
+    try:
+        max_results = int(os.getenv("LLM_WEB_SEARCH_MAX_RESULTS") or "5")
+    except ValueError:
+        max_results = 5
+    max_results = max(1, min(max_results, 10))
+    return [{
+        "type": "openrouter:web_search",
+        "parameters": {
+            "engine": engine,
+            "max_results": max_results,
+            "max_uses": 3,
+            "search_context_size": "medium",
+        },
+    }]
+
+
+def _append_web_citations(message):
+    """Converte anotações de busca em links legíveis, sem confiar em URLs inválidas."""
+    payload = message.model_dump() if hasattr(message, "model_dump") else {}
+    annotations = payload.get("annotations") or []
+    links = []
+    seen = set()
+    for annotation in annotations:
+        citation = (annotation or {}).get("url_citation") or {}
+        url = citation.get("url")
+        title = citation.get("title") or url
+        if not isinstance(url, str) or urlparse(url).scheme not in {"http", "https"}:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        safe_title = str(title).replace("[", "\\[").replace("]", "\\]")[:180]
+        links.append(f"- [{safe_title}]({url})")
+    content = message.content or "Não consegui gerar uma resposta."
+    if links:
+        content += "\\n\\n**Fontes consultadas:**\\n" + "\\n".join(links)
+    return content
+
+
 def answer(messages):
     model = (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
     effort = (os.getenv("LLM_REASONING_EFFORT") or "high").strip().lower()
@@ -72,10 +124,11 @@ def answer(messages):
     response = get_client().chat.completions.create(
         model=model,
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+        tools=_web_search_tools(),
         extra_body={"reasoning": {"effort": effort}},
         temperature=0.25,
     )
-    return response.choices[0].message.content or "Não consegui gerar uma resposta."
+    return _append_web_citations(response.choices[0].message)
 
 
 def answer_with_image(prompt, image_data_url):
