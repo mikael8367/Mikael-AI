@@ -171,7 +171,10 @@ def connector_tools(db):
             tools.extend([
                 {"type": "function", "function": {"name": "github_list_repositories", "description": "Lista repositórios da conta GitHub conectada. Use quando o usuário pedir para ver seus repositórios.", "parameters": {"type": "object", "properties": {"visibility": {"type": "string", "enum": ["all", "public", "private"]}}, "additionalProperties": False}}},
                 {"type": "function", "function": {"name": "github_read_file", "description": "Lê um arquivo de um repositório GitHub autorizado. Informe owner, repo e path.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "ref": {"type": "string"}}, "required": ["owner", "repo", "path"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_list_issues", "description": "Lista issues abertas de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}}, "required": ["owner", "repo"], "additionalProperties": False}}}
+                {"type": "function", "function": {"name": "github_list_issues", "description": "Lista issues abertas de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}}, "required": ["owner", "repo"], "additionalProperties": False}}},
+                {"type": "function", "function": {"name": "github_write_file", "description": "Cria ou atualiza um arquivo de texto em um repositório GitHub autorizado, gerando um commit. Nunca use para apagar arquivos. Informe uma mensagem de commit clara.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "content": {"type": "string"}, "message": {"type": "string"}, "branch": {"type": "string"}}, "required": ["owner", "repo", "path", "content", "message"], "additionalProperties": False}}},
+                {"type": "function", "function": {"name": "github_create_issue", "description": "Cria uma issue em um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title"], "additionalProperties": False}}},
+                {"type": "function", "function": {"name": "github_create_pull_request", "description": "Cria um pull request entre branches existentes de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "head": {"type": "string"}, "base": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title", "head", "base"], "additionalProperties": False}}}
             ])
         elif connector.provider == "mcp":
             try:
@@ -232,6 +235,44 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 return {"error": "Owner ou repositório inválido."}
             data = _http_json("https://api.github.com/repos/%s/%s/issues?state=open&per_page=30" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")), token)
             return [{"number": x.get("number"), "title": x.get("title"), "url": x.get("html_url"), "state": x.get("state")} for x in data if "pull_request" not in x]
+        if name == "github_write_file":
+            owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
+            content, message = arguments.get("content"), arguments.get("message")
+            if not all(isinstance(x, str) and x and len(x) < 200 for x in (owner, repo, path)) or not isinstance(content, str) or not isinstance(message, str) or not message.strip():
+                return {"error": "Parâmetros de arquivo ou mensagem de commit inválidos."}
+            if len(content.encode("utf-8")) > 800000:
+                return {"error": "Arquivo excede o limite de 800 KB."}
+            branch = arguments.get("branch")
+            query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
+            base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
+            current = None
+            try:
+                current = _http_json(base + (("?" + query) if query else ""), token).get("sha")
+            except RuntimeError as exc:
+                if "HTTP 404" not in str(exc):
+                    raise
+            payload = {"message": message[:200], "content": base64.b64encode(content.encode("utf-8")).decode("ascii")}
+            if current:
+                payload["sha"] = current
+            if isinstance(branch, str) and branch:
+                payload["branch"] = branch
+            result = _http_json(base, token, method="PUT", payload=payload)
+            return {"ok": True, "path": result.get("content", {}).get("path", path), "commit": result.get("commit", {}).get("html_url")}
+        if name == "github_create_issue":
+            owner, repo, title = arguments.get("owner"), arguments.get("repo"), arguments.get("title")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, title)):
+                return {"error": "Owner, repositório ou título inválido."}
+            payload = {"title": title[:200], "body": str(arguments.get("body") or "")[:60000]}
+            result = _http_json("https://api.github.com/repos/%s/%s/issues" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")), token, method="POST", payload=payload)
+            return {"ok": True, "number": result.get("number"), "url": result.get("html_url")}
+        if name == "github_create_pull_request":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            title, head, base = arguments.get("title"), arguments.get("head"), arguments.get("base")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, title, head, base)):
+                return {"error": "Parâmetros do pull request inválidos."}
+            payload = {"title": title[:200], "head": head[:200], "base": base[:200], "body": str(arguments.get("body") or "")[:60000]}
+            result = _http_json("https://api.github.com/repos/%s/%s/pulls" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")), token, method="POST", payload=payload)
+            return {"ok": True, "number": result.get("number"), "url": result.get("html_url")}
         return {"error": "Ferramenta GitHub desconhecida."}
     if name.startswith("mcp_"):
         parts = name.split("_", 2)
