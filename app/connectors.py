@@ -503,7 +503,10 @@ def execute_connector_tool(name: str, arguments: dict, db):
             item=db.get(UploadedFile,file_id)
             if not item:return {"error":"Arquivo não encontrado."}
             import hashlib
-            return {"file_id":item.id,"filename":item.filename,"content":(item.extracted_text or "")[:30000],"sha256":hashlib.sha256((item.extracted_text or "").encode("utf-8")).hexdigest()}
+            content=item.extracted_text or ""
+            if len(content)>10000:
+                return {"error":"Este arquivo tem mais de 10.000 caracteres e não pode ser editado com segurança por esta ferramenta. Use a análise por partes ou baixe o arquivo."}
+            return {"file_id":item.id,"filename":item.filename,"content":content,"sha256":hashlib.sha256(content.encode("utf-8")).hexdigest()}
         if name == "workspace_update_file":
             import hashlib
             file_id=arguments.get("file_id")
@@ -516,6 +519,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
             item=db.get(UploadedFile,file_id)
             if not item:
                 return {"error":"Arquivo não encontrado."}
+            if len(item.extracted_text or "")>10000:
+                return {"error":"O arquivo excede 10.000 caracteres e não pode ser atualizado com segurança por esta ferramenta."}
             allowed_extensions={"txt","md","py","js","ts","jsx","tsx","java","kt","json","yaml","yml","xml","html","css","scss","gradle","properties","toml","log","csv","sql","sh","c","cpp","h","cs","go","rs","php","rb"}
             extension=item.filename.rsplit(".",1)[-1].lower() if "." in item.filename else ""
             if extension not in allowed_extensions:
