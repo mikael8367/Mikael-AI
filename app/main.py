@@ -142,6 +142,97 @@ def list_models(_: None = Depends(require_auth)):
     ]
 
 
+@app.get("/api/connectors")
+def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
+    rows = db.scalars(select(Connector).order_by(Connector.id.asc())).all()
+    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True} for c in rows]
+
+
+@app.get("/api/connectors/github/start")
+def github_oauth_start(_: None = Depends(require_auth)):
+    from itsdangerous import URLSafeTimedSerializer
+    client_id = (os.getenv("GITHUB_CLIENT_ID") or "").strip()
+    if not client_id or not (os.getenv("GITHUB_CLIENT_SECRET") or "").strip():
+        raise HTTPException(503, "Configure GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET no Render primeiro.")
+    state = URLSafeTimedSerializer(os.getenv("APP_SECRET"), salt="mikael-github-oauth").dumps({"nonce": os.urandom(16).hex()})
+    redirect_uri = (os.getenv("GITHUB_REDIRECT_URI") or "https://mikael-ai.onrender.com/api/connectors/github/callback").strip()
+    from urllib.parse import urlencode
+    url = "https://github.com/login/oauth/authorize?" + urlencode({
+        "client_id": client_id, "redirect_uri": redirect_uri, "scope": "read:user repo", "state": state
+    })
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie("mikael_github_oauth_state", state, httponly=True, secure=True, samesite="lax", max_age=600, path="/")
+    return response
+
+
+@app.get("/api/connectors/github/callback")
+def github_oauth_callback(request: Request, code: str = "", state: str = "", error: str = "", db: Session = Depends(get_db), _: None = Depends(require_auth)):
+    from itsdangerous import URLSafeTimedSerializer
+    cookie_state = request.cookies.get("mikael_github_oauth_state", "")
+    def redirect_error():
+        response = RedirectResponse("/?connector_error=github_failed", status_code=303)
+        response.delete_cookie("mikael_github_oauth_state", path="/")
+        return response
+    if error or not code or not state or not cookie_state or state != cookie_state:
+        return redirect_error()
+    try:
+        URLSafeTimedSerializer(os.getenv("APP_SECRET"), salt="mikael-github-oauth").loads(state, max_age=600)
+        redirect_uri = (os.getenv("GITHUB_REDIRECT_URI") or "https://mikael-ai.onrender.com/api/connectors/github/callback").strip()
+        token, account = github_exchange_code(code, redirect_uri)
+        login_name = str(account.get("login") or "GitHub")
+        existing = db.scalars(select(Connector).where(Connector.provider == "github")).first()
+        if existing:
+            existing.secret = encrypt_secret(token)
+            existing.account = login_name
+            existing.name = "GitHub"
+        else:
+            db.add(Connector(provider="github", name="GitHub", account=login_name, endpoint="", secret=encrypt_secret(token)))
+        db.commit()
+        response = RedirectResponse("/?connector=github_connected", status_code=303)
+        response.delete_cookie("mikael_github_oauth_state", path="/")
+        return response
+    except Exception as exc:
+        logging.error("Falha OAuth GitHub (%s)", type(exc).__name__)
+        return redirect_error()
+
+
+@app.post("/api/connectors/mcp")
+def add_mcp_connector(body: MCPConnectorBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    endpoint = validate_mcp_endpoint(body.endpoint)
+    token = body.token.strip() or None
+    tools = mcp_test(endpoint, token)
+    item = Connector(provider="mcp", name=body.name.strip(), endpoint=endpoint, account="%s ferramenta(s)" % len(tools), secret=encrypt_secret(token) if token else "")
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "provider": "mcp", "name": item.name, "account": item.account, "endpoint": item.endpoint, "connected": True, "tools": tools}
+
+
+@app.post("/api/connectors/{connector_id}/test")
+def test_connector(connector_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(Connector, connector_id)
+    if not item:
+        raise HTTPException(404, "Conector não encontrado.")
+    if item.provider == "github":
+        from .connectors import _http_json, decrypt_secret
+        account = _http_json("https://api.github.com/user", decrypt_secret(item.secret))
+        return {"ok": True, "account": account.get("login", item.account)}
+    tools = mcp_test(item.endpoint, decrypt_secret(item.secret) if item.secret else None)
+    item.account = "%s ferramenta(s)" % len(tools)
+    db.commit()
+    return {"ok": True, "account": item.account, "tools": tools}
+
+
+@app.delete("/api/connectors/{connector_id}")
+def disconnect_connector(connector_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(Connector, connector_id)
+    if not item:
+        raise HTTPException(404, "Conector não encontrado.")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/chat")
 def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
     c = db.get(Conversation, body.conversation_id) if body.conversation_id else None
