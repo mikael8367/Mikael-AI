@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Entregar no Android uma opção Cloud/No dispositivo, chat offline com llama.cpp e orçamento configurável de RAM, preservando o site e o backend atuais.
+**Goal:** Entregar um aplicativo Android nativo e exclusivamente offline, com chat local via llama.cpp, histórico privado e orçamento configurável de RAM. O app não pode depender do site, Render ou OpenRouter.
 
-**Architecture:** O Android passa a ter uma navegação nativa simples com abas inferiores para Cloud, Local e Configurações. Cloud continua abrindo a WebView existente; Local usa JNI para chamar llama.cpp diretamente, com modelos GGUF no armazenamento privado e histórico local; Configurações controla modo, modelo, contexto e orçamento de memória. A compilação nativa ARM64 será feita com CMake/NDK no workflow GitHub Actions.
+**Architecture:** O Android terá navegação inteiramente nativa com abas inferiores animadas para Chat, Modelos e Configurações. O chat usa JNI para chamar llama.cpp diretamente, com modelos GGUF no armazenamento privado e histórico local; Configurações controla modelo, contexto e orçamento de memória. Não haverá WebView, modo Cloud nem cliente de API remota. A compilação nativa ARM64 será feita com CMake/NDK no workflow GitHub Actions.
 
 **Tech Stack:** Kotlin, Android SDK (minSdk 26), Android NDK, CMake, C++ llama.cpp C API, JNI, GGUF, Gradle, GitHub Actions.
 
@@ -19,7 +19,7 @@
 - O modo local não pode enviar prompts/histórico para o endpoint Cloud.
 - Limites configuráveis: 512 MiB, 768 MiB, 1024 MiB, 1536 MiB e 2048 MiB, limitados pelo orçamento seguro estimado do aparelho.
 - Limite de RAM é orçamento do runtime, não promessa de limitar a memória total do processo Android.
-- Primeira entrega local suporta texto; visão, imagem, busca web e ferramentas externas não podem aparecer como recursos locais funcionais.
+- Primeira entrega suporta texto offline; visão, imagem, busca web e ferramentas externas não podem aparecer como recursos funcionais.
 - Não criar serviços pagos, não fazer deploy e não gerar APK manualmente nesta etapa.
 
 ## Review Focus
@@ -119,7 +119,7 @@
 - [ ] Garantir por teste que o fluxo local não chama `/api/chat/stream` nem qualquer endpoint de chat.
 - [ ] Rodar testes e revisar concorrência entre geração, cancelamento e troca de conversa.
 
-### Task 5: Navegação nativa, chat e configurações
+### Task 5: Aplicativo nativo offline, chat e configurações
 
 **Files:**
 - Create: `android/app/src/main/java/com/mikael/ai/AndroidAppController.kt`
@@ -140,7 +140,7 @@
 - [ ] Implementar navegação inferior com abas Cloud, Local e Configurações, feedback de carregamento e animações leves.
 - [ ] Construir tela de configurações com opções de RAM, seleção/instalação de modelo, espaço usado, memória disponível e descarregar modelo.
 - [ ] Implementar chat local com streaming, enviar, cancelar, estados vazios/erro e histórico local.
-- [ ] Manter navegação Cloud isolada e confirmar que a interface web e seus arquivos não mudaram.
+- [ ] Confirmar que todas as telas funcionam sem rede depois de instalar um modelo e que o site e seus arquivos não mudaram.
 - [ ] Rodar testes de roteamento e revisar acessibilidade/toque em telas pequenas.
 
 ### Task 6: Integração, build e auditoria profunda
@@ -152,12 +152,12 @@
 
 - [ ] Rodar testes unitários, lint e build debug ARM64 com NDK/CMake no CI.
 - [ ] Verificar logs de build, bibliotecas empacotadas, ABI e tamanho do APK.
-- [ ] Auditar privacidade: prompts locais não saem do aparelho; logs não contêm prompt/token; Cloud continua com autenticação e host restrito.
+- [ ] Auditar privacidade: prompts, respostas e histórico não saem do aparelho; logs não contêm prompt/token; nenhum endpoint de chat remoto é chamado.
 - [ ] Auditar memória: load/unload repetido, contexto grande, pressão de memória, cancelamento e troca de modo.
 - [ ] Auditar downloads: falha de rede, checksum, armazenamento cheio, retomada e exclusão.
 - [ ] Revisar ciclo de vida Android, rotação, background, encerramento do processo e recuperação de estado.
 - [ ] Atualizar README com instalação de modelos, limites conhecidos, recursos não suportados e procedimento de build pelo celular.
-- [ ] Comparar a branch com `main` e confirmar que nenhum arquivo do site/produção foi alterado.
+- [ ] Comparar a branch com `main` e confirmar que nenhum arquivo do site/produção foi alterado e que o APK não contém WebView/Cloud.
 - [ ] Não declarar pronto para uso no aparelho sem teste real em Android ARM64; separar claramente resultado de CI e teste físico.
 
 ## Ordem e dependências
