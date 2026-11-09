@@ -48,7 +48,7 @@ class LoginBody(BaseModel):
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     conversation_id: int | None = None
-    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini)$")
+    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini|gemini_flash|claude_sonnet|qwen_coder|gpt5_mini)$")
 
 
 class MCPConnectorBody(BaseModel):
@@ -148,9 +148,13 @@ def get_conversation(
 @app.get("/api/models")
 def list_models(_: None = Depends(require_auth)):
     return [
-        {"id": "mikael", "name": "Mikael AI", "description": "Perfil principal da Mikael AI, usando o modelo padrão configurado."},
-        {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo focado em raciocínio e programação."},
-        {"id": "gpt4o_mini", "name": "GPT-4o mini", "description": "Modelo compacto multimodal."},
+        {"id": "mikael", "name": "Mikael AI", "description": "Perfil principal, usando o modelo padrão configurado no servidor."},
+        {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo geral com foco em raciocínio e programação."},
+        {"id": "gpt4o_mini", "name": "GPT-4o mini", "description": "Modelo compacto para tarefas rápidas."},
+        {"id": "gemini_flash", "name": "Gemini 2.5 Flash", "description": "Modelo multimodal rápido da Google."},
+        {"id": "claude_sonnet", "name": "Claude Sonnet 4.5", "description": "Modelo avançado para análise e programação."},
+        {"id": "qwen_coder", "name": "Qwen3 Coder Plus", "description": "Modelo especializado em programação."},
+        {"id": "gpt5_mini", "name": "GPT-5 mini", "description": "Modelo compacto da OpenAI."},
     ]
 
 
