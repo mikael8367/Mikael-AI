@@ -39,3 +39,20 @@ def answer(messages):
         temperature=0.25,
     )
     return response.choices[0].message.content or "Não consegui gerar uma resposta."
+
+
+def answer_with_image(prompt, image_data_url):
+    """Analisa uma imagem usando um modelo com suporte a visão configurável."""
+    model = (os.getenv("LLM_VISION_MODEL") or "openai/gpt-4o-mini").strip()
+    response = get_client().chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ]},
+        ],
+        temperature=0.2,
+    )
+    return response.choices[0].message.content or "Não consegui analisar essa imagem."
