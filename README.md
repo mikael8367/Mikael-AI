@@ -104,7 +104,7 @@ Para ativar:
 2. Configure `LLM_PROVIDER=local`.
 3. Configure `LLM_LOCAL_BASE_URL` com a URL HTTPS do servidor, incluindo `/v1`.
 4. Configure `LLM_LOCAL_MODEL` com o nome exato publicado pelo endpoint `/v1/models`.
-5. Se o servidor exigir autenticação, configure `LLM_LOCAL_API_KEY`.
+5. Configure `LLM_LOCAL_API_KEY` com o token de acesso do servidor. O backend exige esse token para não expor um endpoint público sem autenticação.
 
 O modo local mostra somente o perfil Mikael AI. Os perfis externos DeepSeek e GPT-4o mini ficam ocultos e bloqueados para evitar custos acidentais. A busca web e a geração de imagens via OpenRouter são desativadas nesse modo. A análise de imagens só funciona se houver um modelo de visão local configurado em `LLM_LOCAL_VISION_MODEL`.
 
