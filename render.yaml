@@ -17,7 +17,17 @@ services:
         fromDatabase:
           name: mikael-ai-db
           property: connectionString
+      - key: LLM_PROVIDER
+        value: openrouter
       - key: LLM_API_KEY
+        sync: false
+      - key: LLM_LOCAL_BASE_URL
+        sync: false
+      - key: LLM_LOCAL_API_KEY
+        sync: false
+      - key: LLM_LOCAL_MODEL
+        value: mikael-coder
+      - key: LLM_LOCAL_VISION_MODEL
         sync: false
       - key: LLM_BASE_URL
         value: https://openrouter.ai/api/v1
