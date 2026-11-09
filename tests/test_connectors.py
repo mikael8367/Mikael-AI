@@ -98,6 +98,7 @@ class ConnectorSecurityTests(unittest.TestCase):
 
     def test_connector_has_enabled_flag_defaulting_to_true(self):
         self.assertIn("enabled", Connector.__table__.columns)
+        self.assertIn("avatar_url", Connector.__table__.columns)
         self.assertTrue(Connector.__table__.columns["enabled"].default.arg)
 
     def test_pending_action_model_has_expiration_and_single_use_status(self):
