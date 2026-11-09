@@ -17,7 +17,7 @@ from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
-APP_VERSION = "1.10.0"
+APP_VERSION = "1.11.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,6 +29,9 @@ with engine.begin() as connection:
         connection.execute(text(f"ALTER TABLE uploaded_files ADD COLUMN file_data {binary_type}"))
     if "mime_type" not in columns:
         connection.execute(text("ALTER TABLE uploaded_files ADD COLUMN mime_type VARCHAR(120)"))
+    connector_columns = {column["name"] for column in inspect(connection).get_columns("connectors")}
+    if "enabled" not in connector_columns:
+        connection.execute(text("ALTER TABLE connectors ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
 
 app = FastAPI(title="Mikael AI", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -145,7 +148,7 @@ def list_models(_: None = Depends(require_auth)):
 @app.get("/api/connectors")
 def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).order_by(Connector.id.asc())).all()
-    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True} for c in rows]
+    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True, "enabled": bool(c.enabled)} for c in rows]
 
 
 @app.get("/api/connectors/github/start")
@@ -185,6 +188,7 @@ def github_oauth_callback(request: Request, code: str = "", state: str = "", err
             existing.secret = encrypt_secret(token)
             existing.account = login_name
             existing.name = "GitHub"
+            existing.enabled = True
         else:
             db.add(Connector(provider="github", name="GitHub", account=login_name, endpoint="", secret=encrypt_secret(token)))
         db.commit()
@@ -209,6 +213,20 @@ def add_mcp_connector(body: MCPConnectorBody, _: None = Depends(require_auth), d
     db.commit()
     db.refresh(item)
     return {"id": item.id, "provider": "mcp", "name": item.name, "account": item.account, "endpoint": item.endpoint, "connected": True, "tools": tools}
+
+
+class ConnectorEnabledBody(BaseModel):
+    enabled: bool
+
+
+@app.patch("/api/connectors/{connector_id}/enabled")
+def set_connector_enabled(connector_id: int, body: ConnectorEnabledBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(Connector, connector_id)
+    if not item:
+        raise HTTPException(404, "Conector não encontrado.")
+    item.enabled = body.enabled
+    db.commit()
+    return {"ok": True, "id": item.id, "enabled": bool(item.enabled)}
 
 
 @app.post("/api/connectors/{connector_id}/test")
