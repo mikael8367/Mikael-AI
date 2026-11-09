@@ -38,6 +38,13 @@
     </section>
     <section id="tab-files" class="tab-page">
       <div class="section-head"><div><span class="eyebrow">DOCUMENTOS E CÓDIGO</span><h2>Arquivos</h2></div></div>
+      <div class="setting-card">
+        <b>Criar arquivo com IA</b>
+        <p>Descreva o que a Mikael AI deve criar. Ela gera o conteúdo e salva para você baixar.</p>
+        <input id="newFileName" type="text" maxlength="120" placeholder="Nome do arquivo, ex.: Main.java">
+        <textarea id="newFileDescription" rows="4" maxlength="12000" placeholder="Descreva o que o arquivo deve fazer..."></textarea>
+        <button id="generateFile" class="primary">Gerar arquivo</button>
+      </div>
       <label class="upload-card">＋<b>Enviar arquivo</b><small>PDF, DOCX, Java, Python, JS, JSON e mais · até 8 MB</small><input id="fileInput" type="file" hidden></label>
       <div id="fileList" class="list"></div>
     </section>
