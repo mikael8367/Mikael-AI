@@ -116,3 +116,28 @@ main{width:min(100% - 32px,780px);margin:0 auto;padding:25px 0 35px}
 .permission-warning{padding:9px 10px;border-left:3px solid #d6a64e;background:#302817;color:#f1d69c;font-size:11px;line-height:1.5}
 .connector-note{line-height:1.5}
 @media(max-width:380px){.permissions-heading{flex-direction:column}.permissions-heading .outline{width:100%}}
+
+#conversationSearch{margin:0 0 10px;min-height:44px;background:#0b1911}
+.conversation-group-title{padding:10px 4px 2px;color:#70d99a;font-size:11px;font-weight:850;letter-spacing:.7px;text-transform:uppercase}
+.conversation-item{display:flex;align-items:center;gap:10px;min-height:58px;padding:10px 13px;transition:border-color .18s,background .18s,transform .18s}
+.conversation-item:active{transform:scale(.99)}
+.conversation-item-content{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+.conversation-item-content b{font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conversation-item-content small{font-size:10px;color:var(--muted)}
+.conversation-arrow{font-size:22px;color:#67d993;line-height:1}
+#currentConversationLabel{display:block;margin:0 4px 8px}
+.work-status{padding:8px 11px;border:1px solid #316344;border-radius:10px;background:#10291a;color:#86e9a9;font-size:11px;line-height:1.45;animation:pageIn .18s ease}
+.work-status.hidden{display:none}
+.voice-toggle{display:flex;align-items:center;gap:10px;color:#d7e8dc;font-size:13px}
+.voice-toggle input{width:18px;height:18px;accent-color:#28c76f}
+.connector-tool-settings{width:100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.connector-tool-settings>b{display:block;font-size:13px}
+.connector-tool-settings>small{display:block;color:var(--muted);font-size:10px;line-height:1.45;margin:4px 0 10px}
+.connector-tool-list{display:flex;flex-direction:column;gap:7px;max-height:340px;overflow:auto}
+.connector-tool-option{display:flex;align-items:flex-start;gap:9px;padding:9px;border:1px solid #254331;border-radius:10px;background:#0a1710}
+.connector-tool-option input{width:17px;height:17px;min-width:17px;margin:2px 0 0;accent-color:#28c76f}
+.connector-tool-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.connector-tool-copy b{font-size:12px}
+.connector-tool-copy small{font-size:10px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.connector-tool-settings>button{margin-top:10px;width:100%}
+@media(max-width:420px){.connector-tool-option{padding:8px}.conversation-item-content b{max-width:245px}}
