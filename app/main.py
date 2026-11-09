@@ -16,8 +16,10 @@ from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
 from .llm import answer
 
+APP_VERSION = "1.0.0"
+
 Base.metadata.create_all(bind=engine)
-app = FastAPI(title="Mikael AI", version="1.0.0")
+app = FastAPI(title="Mikael AI", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -37,12 +39,13 @@ class MemoryBody(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return Path("app/static/index.html").read_text(encoding="utf-8")
+    page = Path("app/static/index.html").read_text(encoding="utf-8")
+    return page.replace("__APP_VERSION__", APP_VERSION)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": "Mikael AI"}
+    return {"status": "ok", "app": "Mikael AI", "version": APP_VERSION}
 
 
 @app.post("/api/login")
