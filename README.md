@@ -10,6 +10,7 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Análise de arquivos pelo modelo (sem executar os arquivos).
 - Instruções avançadas de engenharia de software, depuração e revisão de código.
 - Modelo DeepSeek V4.1 Flash com nível de raciocínio configurável.
+- Pesquisa na web sob demanda pelo OpenRouter, com links das fontes incluídos nas respostas.
 - Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
@@ -38,6 +39,9 @@ A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao 
 
 ## Geração de imagens
 A geração usa a mesma `LLM_API_KEY` do OpenRouter e o modelo definido em `LLM_IMAGE_MODEL` (padrão: `google/gemini-2.5-flash-image`). A geração de imagens pode consumir créditos e não deve ser considerada gratuita. O usuário descreve a imagem no campo da conversa e toca no botão ✧. A imagem é salva em Arquivos.
+
+## Pesquisa na web
+A Mikael AI pode pesquisar na web quando a pergunta pedir informações atuais, documentação, versões, APIs ou quando o usuário solicitar uma pesquisa. A busca é executada pelo servidor do OpenRouter e as fontes retornadas são anexadas à resposta. Configure `LLM_WEB_SEARCH_ENABLED`, `LLM_WEB_SEARCH_ENGINE` e `LLM_WEB_SEARCH_MAX_RESULTS`. O padrão usa Exa com até 5 resultados e limita até 3 chamadas de busca por resposta. A pesquisa pode gerar cobrança adicional na conta OpenRouter, além dos tokens do modelo; confira os preços atuais antes de usar.
 
 ## Modelo de programação e raciocínio
 O modelo padrão é `deepseek/deepseek-v4.1-flash`, com `LLM_REASONING_EFFORT=high`. O modelo e o nível de raciocínio podem ser alterados pelas variáveis `LLM_MODEL` e `LLM_REASONING_EFFORT` (`low`, `medium` ou `high`). O uso do provedor pode gerar custos conforme os preços e créditos da conta OpenRouter.
