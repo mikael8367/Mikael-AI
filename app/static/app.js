@@ -53,8 +53,8 @@ async function loadPendingApprovals(){
 async function api(url,opts={}){const res=await fetch(url,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})},credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.detail||'Erro na solicitação');return data}
 function showTab(tab){const page=$('tab-'+tab);if(!page)return;document.querySelectorAll('.tab-page').forEach(x=>x.classList.remove('active'));page.classList.add('active');document.querySelectorAll('.nav-item').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false')});if(tab==='files')loadFiles();if(tab==='settings'){loadMemories();loadConnectors();}if(tab==='chat')loadConversations()}
 function bubble(role,text){const el=document.createElement('div');el.className='bubble '+role;el.textContent=text;$('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;return el}
-function resetChat(){conversationViewRequest++;conversationId=null;$('messages').innerHTML='<div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div>'}
-async function newConversation(){try{const c=await api('/api/conversations',{method:'POST'});conversationId=c.id;resetChat();conversationId=c.id;await loadConversations();toast('Nova conversa criada')}catch(e){toast('Não foi possível criar a conversa: '+e.message)}}
+function resetChat(){conversationViewRequest++;conversationId=null;$('currentConversationLabel').textContent='Nenhuma conversa selecionada';$('messages').innerHTML='<div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div>'}
+async function newConversation(){try{const c=await api('/api/conversations',{method:'POST'});resetChat();conversationId=c.id;$('currentConversationLabel').textContent='Conversa atual: '+(c.title||'Nova conversa');await loadConversations();toast('Nova conversa criada')}catch(e){toast('Não foi possível criar a conversa: '+e.message)}}
 function renderConversations(){
   const list=$('conversationList');
   const query=($('conversationSearch')?.value||'').trim().toLocaleLowerCase('pt-BR');
@@ -294,7 +294,7 @@ $('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};
 $('githubPermissionsRefresh').onclick=loadGitHubPermissions;
 $('conversationSearch').addEventListener('input',renderConversations);
 $('speakProgress').onchange=()=>{speakProgressEnabled=$('speakProgress').checked;try{localStorage.setItem('mikael_speak_progress',speakProgressEnabled?'1':'0')}catch{}if(!speakProgressEnabled&&'speechSynthesis'in window)window.speechSynthesis.cancel();toast(speakProgressEnabled?'Leitura das atualizações ativada.':'Leitura das atualizações desativada.')};
-try{$('speakProgress').checked=localStorage.getItem('mikael_speak_progress')==='1'}catch{}
+try{$('speakProgress').checked=localStorage.getItem('mikael_speak_progress')==='1'}catch{}if(!('speechSynthesis'in window)||!('SpeechSynthesisUtterance'in window)){$('speakProgress').disabled=true;$('speakProgress').parentElement.title='Este navegador não oferece leitura em voz alta.'}
 
 $('addMcp').onclick=addMcpConnector;
 $('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
