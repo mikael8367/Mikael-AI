@@ -234,7 +234,7 @@ def _connector_permissions(connector):
         return None
     try:
         value = json.loads(raw)
-        return set(x for x in value if isinstance(x, str)) if isinstance(value, list) else None
+        return set(x for x in value if isinstance(x, str)) if isinstance(value, list) else set()
     except Exception:
         return set()
 
