@@ -12,7 +12,12 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Modelo DeepSeek V4.1 Flash com nível de raciocínio configurável.
 - Pesquisa na web sob demanda pelo OpenRouter, com links das fontes incluídos nas respostas.
 - Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
-- Conector GitHub por OAuth, com leitura e escrita de arquivos, criação de issues e pull requests em repositórios autorizados.
+- Conector GitHub por OAuth, com pesquisa de código, consulta de branches/issues/PRs, criação de branches, arquivos, issues, comentários e pull requests em repositórios autorizados.
+- Vários servidores MCP podem ficar conectados ao mesmo tempo; ferramentas habilitadas de cada serviço podem ser usadas na mesma tarefa.
+- Permissões configuráveis por conector, com seleção individual das ferramentas que a IA pode chamar.
+- Ferramentas internas para listar, criar, ler e modificar arquivos na área Arquivos; modificações exigem leitura prévia e hash atualizado.
+- Chat com atualizações de progresso em tempo real e leitura opcional em voz alta pelo navegador.
+- Histórico de conversas pesquisável e agrupado por período.
 - Cadastro de servidores MCP remotos por HTTPS, com segredo armazenado criptografado e exposição limitada a ferramentas aparentemente somente de leitura.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
@@ -24,11 +29,11 @@ A versão segue o padrão `MAJOR.MINOR.PATCH`:
 - **MINOR** (ex.: `1.1.0`): novos recursos mantendo compatibilidade.
 - **MAJOR** (ex.: `2.0.0`): mudanças grandes que alteram significativamente o funcionamento ou quebram compatibilidade.
 
-A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
+A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py` (atualmente 1.14.0). Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
 
 ## Limites desta versão
 - A IA não treina os pesos do modelo com conversas. O sistema guarda memórias e histórico para recuperar contexto.
-- A aba Projetos ainda é uma área inicial; escrita/edição de repositórios, execução de código em sandbox e busca vetorial avançada não estão habilitadas.
+- A aba Projetos ainda é uma área inicial; execução de código em sandbox e busca vetorial avançada não estão habilitadas. A Mikael AI pode criar/editar arquivos da área Arquivos e operar nos recursos GitHub listados nas ferramentas habilitadas.
 - Arquivos são analisados como texto. O servidor não executa código enviado.
 - O plano gratuito do Render pode dormir por inatividade e os limites de banco/serviço podem mudar. Verifique os limites atuais antes de publicar.
 
@@ -55,6 +60,20 @@ A tela Configurações permite conectar o GitHub e cadastrar servidores MCP remo
 A autorização solicita `read:user`, `repo` e `workflow`. O escopo `repo` permite leitura e escrita nos repositórios públicos e privados aos quais sua conta já tem acesso; `workflow` permite criar ou atualizar arquivos de GitHub Actions. A Mikael AI pode listar repositórios, ler arquivos e issues, criar/atualizar arquivos (gerando commits), criar issues e abrir pull requests. A exclusão de um arquivo individual só fica disponível após uma confirmação separada na própria interface: o cartão informa repositório, caminho e branch, e oferece **Permitir exclusão** ou **Negar**. A autorização OAuth, mesmo já concedida, nunca aprova uma exclusão por si só. Não há ferramenta para apagar repositórios, branches, secrets ou configurações, nem para administrar toda a conta GitHub. Permissões efetivas também dependem das regras da organização, SSO e permissões que você já possui.
 
 Se você já conectou o GitHub antes da versão 1.9.0, desconecte e conecte novamente depois do deploy para o GitHub mostrar a solicitação de `workflow`. A autorização atualizada precisa ser aprovada na tela oficial do GitHub.
+
+### Ferramentas e permissões por conector
+
+Na lista de conectores, abra **O que a Mikael AI pode fazer** para habilitar ou desabilitar cada ferramenta. A opção **Desabilitar** pausa o conector inteiro; as caixas de seleção controlam as ferramentas individualmente. Os servidores MCP continuam limitados a ferramentas que passam pelo filtro de leitura segura do projeto; ferramentas MCP com efeitos colaterais não são liberadas automaticamente.
+
+O GitHub oferece pesquisa de código, leitura de arquivos, listagem de repositórios/branches/issues/pull requests, criação de branches, criação/edição de arquivos, criação de issues, comentários e pull requests. A criação/edição de arquivos gera commits. A exclusão de arquivo exige aprovação separada. A Mikael AI não solicita escopos OAuth de administração de organização, exclusão de repositório ou administração de webhooks/secrets.
+
+### Ferramentas de arquivos da Mikael AI
+
+A IA pode listar arquivos, criar arquivos de texto para download, ler arquivos e modificar arquivos textuais salvos na aba Arquivos. Para modificar, precisa ler o arquivo e usar o hash de conteúdo retornado; se o arquivo mudou, a atualização é recusada. Arquivos com mais de 10.000 caracteres não são modificados por essa ferramenta para evitar sobrescritas parciais. O servidor não executa código enviado ou gerado.
+
+### Atualizações durante o trabalho
+
+O chat recebe eventos de progresso enquanto a IA prepara conectores, chama ferramentas e organiza a resposta. Em Configurações, é possível ativar a leitura em voz alta; ela depende do suporte de síntese de voz do navegador e usa a voz disponível no aparelho.
 
 ### Aprovação de ações destrutivas
 
