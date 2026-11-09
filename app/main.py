@@ -1,4 +1,4 @@
-import os, re, logging, mimetypes, time
+import os, re, logging, mimetypes, time, json, urllib.parse
 from pathlib import Path
 from io import BytesIO
 
@@ -275,11 +275,11 @@ def approve_action(action_id: int, _: None = Depends(require_auth), db: Session 
             raise HTTPException(409, "GitHub foi desconectado. Conecte novamente antes de aprovar.")
         token = decrypt_secret(connector.secret)
         base = "https://api.github.com/repos/%s/%s/contents/%s" % (
-            __import__("urllib.parse", fromlist=["quote"]).quote(args["owner"], safe=""),
-            __import__("urllib.parse", fromlist=["quote"]).quote(args["repo"], safe=""),
-            __import__("urllib.parse", fromlist=["quote"]).quote(args["path"], safe="/")
+            urllib.parse.quote(args["owner"], safe=""),
+            urllib.parse.quote(args["repo"], safe=""),
+            urllib.parse.quote(args["path"], safe="/")
         )
-        query = __import__("urllib.parse", fromlist=["urlencode"]).urlencode({"ref": args["branch"]}) if args.get("branch") else ""
+        query = urllib.parse.urlencode({"ref": args["branch"]}) if args.get("branch") else ""
         current = _http_json(base + (("?" + query) if query else ""), token)
         if not isinstance(current, dict) or current.get("sha") != args.get("sha"):
             action.status = "stale"
