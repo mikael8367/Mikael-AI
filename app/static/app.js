@@ -1,5 +1,5 @@
 let conversationId=null;
-let isSending=false;
+let isSending=false;\nlet isGeneratingImage=false;
 const $=id=>document.getElementById(id);
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
 async function api(url,opts={}){const res=await fetch(url,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})},credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.detail||'Erro na solicitação');return data}
@@ -18,6 +18,55 @@ $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:J
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
 $('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+async function generateChatImage(){
+  const input=$('prompt');
+  const prompt=input.value.trim();
+  if(prompt.length<5){toast('Descreva a imagem com pelo menos 5 caracteres.');input.focus();return}
+  if(isSending||isGeneratingImage)return;
+  isGeneratingImage=true;
+  const button=$('imageGenBtn');
+  button.disabled=true;
+  $('sendBtn').disabled=true;
+  $('attachBtn').disabled=true;
+  input.disabled=true;
+  input.value='';
+  const messages=$('messages');
+  if(messages.querySelector('.welcome-msg'))messages.innerHTML='';
+  bubble('user','✧ Gerar imagem: '+prompt);
+  const status=bubble('assistant','Criando sua imagem... isso pode levar alguns instantes.');
+  try{
+    const result=await api('/api/images/generate',{method:'POST',body:JSON.stringify({prompt})});
+    status.textContent=result.message||'Imagem criada com sucesso.';
+    const imageBubble=document.createElement('div');
+    imageBubble.className='bubble assistant generated-image-bubble';
+    const img=document.createElement('img');
+    img.src=result.image_data_url;
+    img.alt='Imagem gerada pela Mikael AI';
+    img.loading='lazy';
+    const actions=document.createElement('div');
+    actions.className='generated-image-actions';
+    const download=document.createElement('a');
+    download.href='/api/files/'+result.file_id+'/download';
+    download.textContent='Baixar imagem';
+    download.setAttribute('download',result.filename);
+    actions.append(download);
+    imageBubble.append(img,actions);
+    messages.append(imageBubble);
+    messages.scrollTop=messages.scrollHeight;
+    await loadFiles();
+    toast('Imagem gerada e salva em Arquivos.');
+  }catch(error){
+    status.textContent='Não foi possível gerar a imagem: '+error.message;
+    toast(error.message);
+  }finally{
+    isGeneratingImage=false;
+    button.disabled=false;
+    $('sendBtn').disabled=false;
+    $('attachBtn').disabled=false;
+    input.disabled=false;
+    input.focus();
+  }
+}
 async function handleChatFiles(event){
   const selected=Array.from(event.target.files||[]);
   event.target.value='';
@@ -42,7 +91,7 @@ async function handleChatFiles(event){
   await loadFiles();
 }
 $('sendBtn').onclick=send;$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
-$('attachBtn').onclick=()=>{if(!isSending)$('chatFileInput').click()};
+$('attachBtn').onclick=()=>{if(!isSending&&!isGeneratingImage)$('chatFileInput').click()};\n$('imageGenBtn').onclick=generateChatImage;
 $('chatFileInput').onchange=handleChatFiles;
 $('newChat').onclick=newConversation;$('startChat').onclick=()=>{showTab('chat');newConversation();$('prompt').focus()};
 document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{showTab('chat');resetChat();$('prompt').value=b.dataset.prompt;$('prompt').focus()});
