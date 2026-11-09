@@ -181,6 +181,13 @@ def connector_tools(db):
                     original = tool.get("name")
                     if not isinstance(original, str) or not original:
                         continue
+                    # Only expose tools that appear read-only; side-effecting MCP actions stay blocked.
+                    lowered = original.lower()
+                    if not lowered.startswith(("get_", "list_", "read_", "search_", "find_", "fetch_", "query_", "describe_", "inspect_", "show_", "status_", "whoami")):
+                        continue
+                    description = str(tool.get("description") or "").lower()
+                    if any(word in description for word in ("delete", "remove", "write", "update", "create", "execute", "run command", "send ", "deploy", "purchase", "modify")):
+                        continue
                     import hashlib
                     safe = hashlib.sha256(original.encode()).hexdigest()[:12]
                     name = "mcp_%s_%s" % (connector.id, safe)
@@ -213,7 +220,7 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 return {"error": "Parâmetros owner, repo e path inválidos."}
             ref = arguments.get("ref")
             query = urllib.parse.urlencode({"ref": ref}) if isinstance(ref, str) and ref else ""
-            url = "https://api.github.com/repos/%s/%s/contents/%s" % tuple(urllib.parse.quote(x, safe="") for x in (owner, repo, path))
+            url = "https://api.github.com/repos/%s/%s/contents/%s" % tuple(urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
             data = _http_json(url + (("?" + query) if query else ""), token)
             if data.get("encoding") != "base64" or not data.get("content"):
                 return {"error": "O caminho não corresponde a um arquivo de texto simples."}
