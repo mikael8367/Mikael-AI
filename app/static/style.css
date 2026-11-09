@@ -14,3 +14,7 @@
 @keyframes approvalFade{from{opacity:0}to{opacity:1}}
 @keyframes approvalRise{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:380px){.approval-card{padding:19px}.approval-actions{flex-direction:column-reverse}}
+
+/* Estado e ações dos conectores */
+.connector-item{align-items:flex-start;gap:12px}.connector-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px;overflow-wrap:anywhere}.connector-info small{color:var(--muted,#9aa79e);line-height:1.45}.connector-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.connector-actions button{min-height:38px;padding:8px 11px;font-size:12px}.connector-disabled{opacity:.72;border-style:dashed}.connector-disabled .connector-info b:after{content:" · PAUSADO";font-size:10px;color:#e8b65c}.connector-actions .danger-outline{border:1px solid #b94b4b;color:#ff9b9b;background:transparent}
+@media(max-width:480px){.connector-item{flex-direction:column}.connector-actions{width:100%;justify-content:stretch}.connector-actions button{flex:1}}
