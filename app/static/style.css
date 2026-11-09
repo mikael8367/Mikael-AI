@@ -18,3 +18,6 @@
 /* Estado e ações dos conectores */
 .connector-item{align-items:flex-start;gap:12px}.connector-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px;overflow-wrap:anywhere}.connector-info small{color:var(--muted,#9aa79e);line-height:1.45}.connector-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.connector-actions button{min-height:38px;padding:8px 11px;font-size:12px}.connector-disabled{opacity:.72;border-style:dashed}.connector-disabled .connector-info b:after{content:" · PAUSADO";font-size:10px;color:#e8b65c}.connector-actions .danger-outline{border:1px solid #b94b4b;color:#ff9b9b;background:transparent}
 @media(max-width:480px){.connector-item{flex-direction:column}.connector-actions{width:100%;justify-content:stretch}.connector-actions button{flex:1}}
+
+/* Identidade visual dos conectores */
+.connector-identity{display:flex;align-items:center;gap:12px;min-width:0}.connector-identity-text{display:flex;flex-direction:column;gap:5px;min-width:0}.connector-avatar{width:52px;height:52px;min-width:52px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:linear-gradient(145deg,#176b45,#10251b);color:#d8ffe7;font-weight:800;font-size:15px;border:1px solid #4b8762}.connector-avatar img{width:100%;height:100%;object-fit:cover;display:block}.connector-info{gap:8px}
