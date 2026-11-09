@@ -11,7 +11,9 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Instruções avançadas de engenharia de software, depuração e revisão de código.
 - Modelo DeepSeek V4.1 Flash com nível de raciocínio configurável.
 - Pesquisa na web sob demanda pelo OpenRouter, com links das fontes incluídos nas respostas.
-- Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.\n- Conector GitHub por OAuth, com leitura de repositórios, arquivos e issues.\n- Cadastro de servidores MCP remotos por HTTPS, com segredo armazenado criptografado e exposição limitada a ferramentas aparentemente somente de leitura.
+- Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
+- Conector GitHub por OAuth, com leitura de repositórios, arquivos e issues.
+- Cadastro de servidores MCP remotos por HTTPS, com segredo armazenado criptografado e exposição limitada a ferramentas aparentemente somente de leitura.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
 - Health check em `/health`, incluindo a versão atual.
