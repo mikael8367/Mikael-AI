@@ -14,18 +14,25 @@ Não invente resultados de testes, dependências ou APIs.
 """
 
 def get_client():
-    key = os.getenv("LLM_API_KEY")
-    if not key:
-        raise RuntimeError("Falta configurar LLM_API_KEY no Render.")
+    # Remove espaços acidentais e aceita a chave colada com prefixo Bearer.
+    key = (os.getenv("LLM_API_KEY") or "").strip()
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    if not key or key.lower() in {"sua-chave-do-provedor", "your-api-key", "none", "null"}:
+        raise RuntimeError(
+            "LLM_API_KEY está vazia ou contém um valor de exemplo. "
+            "Configure a chave secreta do provedor nas variáveis do serviço Render."
+        )
+    base_url = (os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1").strip()
     return OpenAI(
         api_key=key,
-        base_url=os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1"),
+        base_url=base_url,
         timeout=90,
         max_retries=2,
     )
 
 def answer(messages):
-    model = os.getenv("LLM_MODEL", "deepseek/deepseek-chat")
+    model = (os.getenv("LLM_MODEL") or "deepseek/deepseek-chat").strip()
     response = get_client().chat.completions.create(
         model=model,
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
