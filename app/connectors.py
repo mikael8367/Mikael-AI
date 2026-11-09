@@ -168,6 +168,8 @@ def connector_tools(db):
     tools = []
     rows = db.query(Connector).all()
     for connector in rows:
+        if not bool(getattr(connector, "enabled", True)):
+            continue
         if connector.provider == "github":
             tools.extend([
                 {"type": "function", "function": {"name": "github_list_repositories", "description": "Lista repositórios da conta GitHub conectada. Use quando o usuário pedir para ver seus repositórios.", "parameters": {"type": "object", "properties": {"visibility": {"type": "string", "enum": ["all", "public", "private"]}}, "additionalProperties": False}}},
@@ -212,6 +214,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
     if name.startswith("github_"):
         if not connector:
             return {"error": "GitHub não está conectado."}
+        if not bool(getattr(connector, "enabled", True)):
+            return {"error": "O conector GitHub está desativado. Ative-o em Configurações para usar suas ferramentas."}
         token = decrypt_secret(connector.secret)
         if name == "github_list_repositories":
             visibility = arguments.get("visibility", "all")
@@ -317,6 +321,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
         item = db.query(Connector).filter_by(id=int(parts[1]), provider="mcp").first()
         if not item:
             return {"error": "Conector MCP não encontrado."}
+        if not bool(getattr(item, "enabled", True)):
+            return {"error": "Este conector MCP está desativado. Ative-o em Configurações para usar suas ferramentas."}
         token = decrypt_secret(item.secret) if item.secret else None
         # Resolve o nome original consultando novamente o servidor, sem confiar no modelo.
         listed = _mcp_call(item.endpoint, token, "tools/list")
