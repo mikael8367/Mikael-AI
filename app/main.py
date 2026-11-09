@@ -442,7 +442,7 @@ def _run_work_task(task_id):
     worker_db = SessionLocal()
     try:
         rounds = 0
-        while rounds < 180:
+        while rounds < 3600:
             task = worker_db.get(WorkTask, task_id)
             if not task or task.status != "running":
                 break
