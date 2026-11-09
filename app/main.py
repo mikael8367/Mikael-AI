@@ -32,6 +32,8 @@ with engine.begin() as connection:
     connector_columns = {column["name"] for column in inspect(connection).get_columns("connectors")}
     if "enabled" not in connector_columns:
         connection.execute(text("ALTER TABLE connectors ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
+    if "avatar_url" not in connector_columns:
+        connection.execute(text("ALTER TABLE connectors ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"))
 
 app = FastAPI(title="Mikael AI", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -148,7 +150,7 @@ def list_models(_: None = Depends(require_auth)):
 @app.get("/api/connectors")
 def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).order_by(Connector.id.asc())).all()
-    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True, "enabled": bool(c.enabled)} for c in rows]
+    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True, "enabled": bool(c.enabled), "avatar_url": c.avatar_url if c.provider == "github" else ""} for c in rows]
 
 
 @app.get("/api/connectors/github/start")
@@ -189,8 +191,12 @@ def github_oauth_callback(request: Request, code: str = "", state: str = "", err
             existing.account = login_name
             existing.name = "GitHub"
             existing.enabled = True
+            avatar_url = str(account.get("avatar_url") or "")
+            existing.avatar_url = avatar_url if avatar_url.startswith("https://avatars.githubusercontent.com/") else ""
         else:
-            db.add(Connector(provider="github", name="GitHub", account=login_name, endpoint="", secret=encrypt_secret(token)))
+            avatar_url = str(account.get("avatar_url") or "")
+            safe_avatar = avatar_url if avatar_url.startswith("https://avatars.githubusercontent.com/") else ""
+            db.add(Connector(provider="github", name="GitHub", account=login_name, endpoint="", secret=encrypt_secret(token), avatar_url=safe_avatar))
         db.commit()
         response = RedirectResponse("/?connector=github_connected", status_code=303)
         response.delete_cookie("mikael_github_oauth_state", path="/")
