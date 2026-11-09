@@ -1,4 +1,4 @@
-import os, re
+import os, re, logging
 from pathlib import Path
 from io import BytesIO
 
@@ -133,8 +133,12 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.commit()
     try:
         result = answer(context)
-    except Exception:
-        raise HTTPException(502, "Falha ao consultar o provedor de IA. Verifique a configuração.")
+    except Exception as exc:
+        # Registra o motivo técnico sem expor credenciais nos logs.
+        detail = str(exc)
+        detail = re.sub(r"(?i)(sk-or-v1-|sk-[A-Za-z0-9_-]{8,})[A-Za-z0-9_-]*", "[CHAVE_OCULTA]", detail)
+        logging.error("Falha no provedor de IA (%s): %s", type(exc).__name__, detail[:1200])
+        raise HTTPException(502, "Falha ao consultar o provedor de IA. Consulte os logs do Render para identificar a causa.")
     db.add(Message(conversation_id=c.id, role="assistant", content=result))
     db.commit()
     return {"conversation_id": c.id, "reply": result}
@@ -235,6 +239,10 @@ def analyze_file(file_id: int, _: None = Depends(require_auth), db: Session = De
     )
     try:
         result = answer([{"role": "user", "content": prompt}])
-    except Exception:
-        raise HTTPException(502, "Falha ao consultar o provedor de IA. Verifique a configuração.")
+    except Exception as exc:
+        # Registra o motivo técnico sem expor credenciais nos logs.
+        detail = str(exc)
+        detail = re.sub(r"(?i)(sk-or-v1-|sk-[A-Za-z0-9_-]{8,})[A-Za-z0-9_-]*", "[CHAVE_OCULTA]", detail)
+        logging.error("Falha no provedor de IA (%s): %s", type(exc).__name__, detail[:1200])
+        raise HTTPException(502, "Falha ao consultar o provedor de IA. Consulte os logs do Render para identificar a causa.")
     return {"analysis": result}
