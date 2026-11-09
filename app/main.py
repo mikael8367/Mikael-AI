@@ -123,7 +123,12 @@ def conversations(_: None = Depends(require_auth), db: Session = Depends(get_db)
     rows = db.scalars(
         select(Conversation).order_by(Conversation.created_at.desc()).limit(100)
     ).all()
-    return [{"id": c.id, "title": c.title, "created_at": c.created_at.isoformat() if c.created_at else ""} for c in rows]
+    result = []
+    for c in rows:
+        activity = max((m.created_at for m in c.messages if m.created_at), default=c.created_at)
+        result.append({"id": c.id, "title": c.title, "created_at": activity.isoformat() if activity else ""})
+    result.sort(key=lambda item: item["created_at"], reverse=True)
+    return result
 
 
 @app.get("/api/conversations/{conversation_id}")
@@ -486,7 +491,11 @@ def chat_stream(body: ChatBody, _: None = Depends(require_auth), db: Session = D
         thread=threading.Thread(target=worker,daemon=True)
         thread.start()
         while True:
-            event=events.get()
+            try:
+                event=events.get(timeout=15)
+            except queue.Empty:
+                yield ": keep-alive\n\n"
+                continue
             if event is None:
                 break
             yield "data: " + json.dumps(event,ensure_ascii=False,default=str) + "\n\n"
