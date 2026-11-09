@@ -100,9 +100,96 @@ function announceProgress(message){
     window.speechSynthesis.speak(utterance);
   }catch{}
 }
+
+let activeWorkTask=null;
+let workPollTimer=null;
+let workPollBusy=false;
+let workStatusReceivedAt=0;
+function formatWorkTime(seconds){
+  const value=Math.max(0,Math.floor(seconds||0));
+  const h=Math.floor(value/3600),m=Math.floor((value%3600)/60),sec=value%60;
+  return h?h+'h '+String(m).padStart(2,'0')+'m':m?m+'m '+String(sec).padStart(2,'0')+'s':sec+'s';
+}
+function renderLongWork(task){
+  activeWorkTask=task;
+  const panel=$('longWorkStatus');
+  if(!task){panel.classList.add('hidden');return}
+  panel.classList.remove('hidden');
+  const labels={running:'Trabalho em andamento',paused:'Trabalho pausado',completed:'Projeto entregue',cancelled:'Trabalho cancelado'};
+  $('longWorkState').textContent=labels[task.status]||'Tarefa salva';
+  $('longWorkProgress').textContent=task.progress||'Aguardando atualização...';
+  const remaining=Math.max(0,Number(task.remaining_seconds)||0);
+  $('longWorkTime').textContent='Tempo restante: '+formatWorkTime(task.status==='running'?remaining-Math.floor((Date.now()-workStatusReceivedAt)/1000):remaining);
+  $('pauseLongWork').disabled=task.status!=='running';
+  $('resumeLongWork').disabled=task.status!=='paused';
+  $('cancelLongWork').disabled=['completed','cancelled'].includes(task.status);
+}
+async function refreshLongWork(){
+  if(workPollBusy)return;
+  workPollBusy=true;
+  try{
+    const task=await api('/api/work/current');
+    if(task){workStatusReceivedAt=Date.now();renderLongWork(task)}
+    else renderLongWork(null);
+  }catch(error){console.warn('Não foi possível atualizar a tarefa:',error.message)}
+  finally{workPollBusy=false}
+}
+async function startLongWork(goal,duration){
+  const clean=String(goal||'').trim();
+  if(clean.length<5){toast('Descreva o projeto antes de iniciar.');return}
+  const button=$('startLongWork');button.disabled=true;
+  try{
+    const task=await api('/api/work/start',{method:'POST',body:JSON.stringify({
+      goal:clean,duration_seconds:Math.min(10800,Math.max(60,Number(duration)||10800)),
+      conversation_id:conversationId,model_id:selectedModel
+    })});
+    conversationId=task.conversation_id;
+    $('workGoal').value='';
+    $('currentConversationLabel').textContent='Conversa atual: trabalho prolongado';
+    workStatusReceivedAt=Date.now();renderLongWork(task);
+    await loadConversations();
+    toast('Trabalho iniciado. Mantenha esta aba aberta para continuar.');
+    showTab('chat');
+  }catch(error){toast('Não foi possível iniciar: '+error.message)}
+  finally{button.disabled=false}
+}
+async function pauseLongWork(){
+  if(!activeWorkTask)return;
+  try{const task=await api('/api/work/'+activeWorkTask.id+'/pause',{method:'POST'});workStatusReceivedAt=Date.now();renderLongWork(task);toast('Trabalho pausado e progresso salvo.')}
+  catch(error){toast('Não foi possível pausar: '+error.message)}
+}
+async function resumeLongWork(){
+  if(!activeWorkTask)return;
+  try{const task=await api('/api/work/'+activeWorkTask.id+'/resume',{method:'POST'});workStatusReceivedAt=Date.now();renderLongWork(task);toast('Trabalho retomado.')}
+  catch(error){toast('Não foi possível continuar: '+error.message)}
+}
+async function cancelLongWork(){
+  if(!activeWorkTask)return;
+  const ok=await confirmInApp('Cancelar trabalho prolongado?','O progresso já salvo será mantido, mas a IA não continuará esta tarefa.','Cancelar trabalho','Voltar');
+  if(!ok)return;
+  try{const task=await api('/api/work/'+activeWorkTask.id+'/cancel',{method:'POST'});workStatusReceivedAt=Date.now();renderLongWork(task);toast('Tarefa cancelada.')}
+  catch(error){toast('Não foi possível cancelar: '+error.message)}
+}
+function pauseWorkWhenHidden(){
+  if(!activeWorkTask||activeWorkTask.status!=='running')return;
+  const id=activeWorkTask.id;
+  activeWorkTask.status='paused';
+  renderLongWork(activeWorkTask);
+  fetch('/api/work/'+id+'/pause',{method:'POST',credentials:'same-origin',keepalive:true})
+    .then(async response=>{if(response.ok){const task=await response.json();workStatusReceivedAt=Date.now();renderLongWork(task)}})
+    .catch(()=>{});
+}
+
 async function send(){
   const input=$('prompt'),text=input.value.trim();
   if(!text||isSending)return;
+  const longMatch=text.match(/\btrabalh(?:e|ar|a)\b[\s\S]{0,100}?\bpor\s+(\d+)\s*(minutos?|mins?|m|horas?|h)\b/i);
+  if(longMatch&&!/\b(não|nao|nunca)\b/i.test(text)){
+    const amount=Number(longMatch[1]);const unit=longMatch[2].toLowerCase();
+    const seconds=amount*(unit.startsWith('h')?3600:60);
+    if(Number.isFinite(seconds)&&seconds>=60&&seconds<=10800){input.value='';await startLongWork(text,seconds);return}
+    toast('O trabalho prolongado aceita de 1 minuto até 3 horas.');return;
+  }
   const requestId=++conversationViewRequest;
   isSending=true;input.value='';input.disabled=true;$('sendBtn').disabled=true;
   $('attachBtn').disabled=true;$('imageGenBtn').disabled=true;
@@ -371,7 +458,11 @@ async function handleChatFiles(event){
   }
   await loadFiles();
 }
-$('sendBtn').onclick=send;$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+$('sendBtn').onclick=send;$('startLongWork').onclick=()=>startLongWork($('workGoal').value,$('workDuration').value);
+$('pauseLongWork').onclick=pauseLongWork;$('resumeLongWork').onclick=resumeLongWork;$('cancelLongWork').onclick=cancelLongWork;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')pauseWorkWhenHidden()});
+window.addEventListener('pagehide',pauseWorkWhenHidden);
+$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 $('attachBtn').onclick=()=>{if(!isSending&&!isGeneratingImage)$('chatFileInput').click()};
 $('imageGenBtn').onclick=generateChatImage;
 $('chatFileInput').onchange=handleChatFiles;
@@ -380,3 +471,5 @@ document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{showTab('ch
 $('generateFile').onclick=generateFile;$('fileInput').onchange=async e=>{const selected=Array.from(e.target.files||[]);if(!selected.length)return;if(selected.length>10){toast('Envie no máximo 10 arquivos por vez.');e.target.value='';return}let sent=0;const errors=[];for(const file of selected){const form=new FormData();form.append('file',file);try{await api('/api/upload',{method:'POST',body:form});sent++}catch(err){errors.push(file.name+': '+err.message)}}e.target.value='';await loadFiles();if(errors.length)toast(sent+' enviado(s). Falhas: '+errors.slice(0,2).join(' | '));else toast(sent+' arquivo(s)/foto(s) enviado(s) com sucesso')};
 $('saveMemory').onclick=async()=>{const content=$('memoryText').value.trim();if(!content)return;try{await api('/api/memories',{method:'POST',body:JSON.stringify({content,category:'projeto'})});$('memoryText').value='';toast('Memória salva');loadMemories()}catch(e){toast(e.message)}};
 boot();
+refreshLongWork();
+workPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshLongWork()},6000);
