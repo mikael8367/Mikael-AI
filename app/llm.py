@@ -69,6 +69,14 @@ def get_client():
                 "O motor local ainda não foi conectado. Configure LLM_LOCAL_BASE_URL "
                 "com a URL HTTPS do servidor próprio compatível com a API OpenAI."
             )
+        parsed_url = urlparse(base_url)
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        if parsed_url.scheme != "https" and not (
+            parsed_url.scheme == "http" and parsed_url.hostname in local_hosts
+        ):
+            raise RuntimeError("LLM_LOCAL_BASE_URL deve usar HTTPS. HTTP só é permitido para testes em localhost.")
+        if not parsed_url.netloc or parsed_url.username or parsed_url.password or parsed_url.fragment:
+            raise RuntimeError("LLM_LOCAL_BASE_URL contém uma URL inválida ou credenciais embutidas.")
         key = (os.getenv("LLM_LOCAL_API_KEY") or "").strip() or "local-no-auth"
         timeout = 300
     else:
