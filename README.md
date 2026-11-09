@@ -29,7 +29,7 @@ A versão segue o padrão `MAJOR.MINOR.PATCH`:
 - **MINOR** (ex.: `1.1.0`): novos recursos mantendo compatibilidade.
 - **MAJOR** (ex.: `2.0.0`): mudanças grandes que alteram significativamente o funcionamento ou quebram compatibilidade.
 
-A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py` (atualmente 1.14.0). Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
+A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py` (atualmente 1.14.1). Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
 
 ## Limites desta versão
 - A IA não treina os pesos do modelo com conversas. O sistema guarda memórias e histórico para recuperar contexto.
@@ -69,7 +69,7 @@ O GitHub oferece pesquisa de código, leitura de arquivos, listagem de repositó
 
 ### Ferramentas de arquivos da Mikael AI
 
-A IA pode listar arquivos, criar arquivos de texto para download, ler arquivos e modificar arquivos textuais salvos na aba Arquivos. Para modificar, precisa ler o arquivo e usar o hash de conteúdo retornado; se o arquivo mudou, a atualização é recusada. Arquivos com mais de 10.000 caracteres não são modificados por essa ferramenta para evitar sobrescritas parciais. O servidor não executa código enviado ou gerado.
+A IA pode listar arquivos, criar arquivos de texto para download, ler arquivos e modificar arquivos textuais salvos na aba Arquivos. Para modificar, precisa ler o arquivo e usar o hash de conteúdo retornado; se o arquivo mudou, a atualização é recusada. No GitHub, a IA também precisa ler primeiro e enviar o SHA atual; arquivos grandes demais para leitura segura não podem ser sobrescritos por essa ferramenta. Arquivos com mais de 10.000 caracteres não são modificados por essa ferramenta para evitar sobrescritas parciais. O servidor não executa código enviado ou gerado.
 
 ### Atualizações durante o trabalho
 
