@@ -126,7 +126,7 @@ MODEL_PRESETS = {
     "gpt4o_mini": "openai/gpt-4o-mini",
 }
 
-def answer(messages, model_id="mikael", external_tools=None, tool_executor=None):
+def answer(messages, model_id="mikael", external_tools=None, tool_executor=None, progress_callback=None):
     if model_id not in MODEL_PRESETS:
         raise ValueError("Modelo de IA inválido.")
     model = MODEL_PRESETS[model_id] or (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
@@ -136,6 +136,8 @@ def answer(messages, model_id="mikael", external_tools=None, tool_executor=None)
     conversation = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     tools = _web_search_tools() + (external_tools or [])
     client = get_client()
+    if progress_callback:
+        progress_callback("Entendi o pedido. Estou preparando a análise e verificando as ferramentas disponíveis.")
     for _ in range(5):
         response = client.chat.completions.create(
             model=model,
@@ -147,6 +149,8 @@ def answer(messages, model_id="mikael", external_tools=None, tool_executor=None)
         message = response.choices[0].message
         calls = getattr(message, "tool_calls", None) or []
         if not calls:
+            if progress_callback:
+                progress_callback("Estou organizando a resposta final e resumindo o que foi realizado.")
             return _append_web_citations(message)
         # Preserve the assistant tool-call message exactly as returned by the provider.
         conversation.append(message.model_dump(exclude_none=True))
@@ -159,7 +163,28 @@ def answer(messages, model_id="mikael", external_tools=None, tool_executor=None)
                 if not tool_executor:
                     result = {"error": "Nenhum executor de conectores está disponível."}
                 else:
+                    if progress_callback:
+                        labels = {
+                            "github_list_repositories":"consultar repositórios do GitHub",
+                            "github_read_file":"ler arquivo no GitHub",
+                            "github_search_code":"pesquisar código no GitHub",
+                            "github_list_branches":"consultar branches do GitHub",
+                            "github_list_pull_requests":"consultar pull requests",
+                            "github_create_branch":"criar branch no GitHub",
+                            "github_write_file":"criar ou modificar arquivo no GitHub",
+                            "github_create_issue":"criar issue no GitHub",
+                            "github_create_issue_comment":"publicar comentário no GitHub",
+                            "github_create_pull_request":"abrir pull request",
+                            "github_delete_file":"preparar solicitação de exclusão para aprovação",
+                            "workspace_list_files":"listar arquivos da área de trabalho",
+                            "workspace_create_file":"criar arquivo na área de trabalho",
+                            "workspace_read_file":"ler arquivo da área de trabalho",
+                            "workspace_update_file":"modificar arquivo da área de trabalho",
+                        }
+                        progress_callback("Estou trabalhando: " + labels.get(function.name, "usando " + function.name.replace("_", " ")) + ".")
                     result = tool_executor(function.name, arguments)
+                    if progress_callback:
+                        progress_callback("Etapa concluída. Estou conferindo o resultado e continuando o trabalho.")
             except Exception as exc:
                 result = {"error": str(exc)[:500]}
             conversation.append({
