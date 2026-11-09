@@ -37,3 +37,14 @@ class UploadedFile(Base):
     file_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Connector(Base):
+    __tablename__ = "connectors"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(30), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    endpoint: Mapped[str] = mapped_column(Text, default="")
+    account: Mapped[str] = mapped_column(String(180), default="")
+    secret: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
