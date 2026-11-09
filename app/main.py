@@ -16,7 +16,7 @@ from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -40,6 +40,7 @@ class LoginBody(BaseModel):
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     conversation_id: int | None = None
+    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini)$")
 
 
 class GenerateImageBody(BaseModel):
@@ -125,6 +126,15 @@ def get_conversation(
     }
 
 
+@app.get("/api/models")
+def list_models(_: None = Depends(require_auth)):
+    return [
+        {"id": "mikael", "name": "Mikael AI", "description": "Perfil principal da Mikael AI, usando o modelo padrão configurado."},
+        {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo focado em raciocínio e programação."},
+        {"id": "gpt4o_mini", "name": "GPT-4o mini", "description": "Modelo compacto multimodal."},
+    ]
+
+
 @app.post("/api/chat")
 def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
     c = db.get(Conversation, body.conversation_id) if body.conversation_id else None
@@ -167,7 +177,7 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.add(Message(conversation_id=c.id, role="user", content=body.message))
     db.commit()
     try:
-        result = answer(context)
+        result = answer(context, model_id=body.model_id)
     except HTTPException:
         raise
     except Exception as exc:
