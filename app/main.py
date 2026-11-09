@@ -17,7 +17,7 @@ from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
 
-APP_VERSION = "1.15.0"
+APP_VERSION = "1.16.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -147,6 +147,10 @@ def get_conversation(
 
 @app.get("/api/models")
 def list_models(_: None = Depends(require_auth)):
+    if (os.getenv("LLM_PROVIDER") or "openrouter").strip().lower() == "local":
+        return [
+            {"id": "mikael", "name": "Mikael AI · Motor próprio", "description": "Modelo de código aberto hospedado em um servidor controlado pelo projeto. Sem cobrança por token de uma API externa."},
+        ]
     return [
         {"id": "mikael", "name": "Mikael AI", "description": "Perfil principal da Mikael AI, usando o modelo padrão configurado."},
         {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo focado em raciocínio e programação."},
