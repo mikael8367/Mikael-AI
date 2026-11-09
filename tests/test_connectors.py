@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi import HTTPException
 
-from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools
+from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled
 from app.models import PendingAction, Connector
 
 
@@ -33,6 +33,19 @@ class ConnectorSecurityTests(unittest.TestCase):
     def test_rejects_local_mcp_host(self):
         with self.assertRaises(HTTPException):
             validate_mcp_endpoint("https://localhost/mcp")
+
+    def test_mcp_name_is_trimmed_and_whitespace_is_rejected(self):
+        self.assertEqual(normalize_mcp_name("  servidor MCP  "), "servidor MCP")
+        with self.assertRaises(HTTPException):
+            normalize_mcp_name("   ")
+
+    def test_disabled_connector_cannot_be_tested(self):
+        with self.assertRaises(HTTPException) as error:
+            ensure_connector_enabled(SimpleNamespace(enabled=False))
+        self.assertEqual(error.exception.status_code, 409)
+
+    def test_legacy_connector_without_enabled_field_remains_enabled(self):
+        ensure_connector_enabled(SimpleNamespace())
 
     def test_github_delete_creates_pending_request_without_deleting(self):
         github = SimpleNamespace(secret=encrypt_secret("github-test-token"))
