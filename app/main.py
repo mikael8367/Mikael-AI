@@ -350,6 +350,8 @@ def analyze_file(file_id: int, _: None = Depends(require_auth), db: Session = De
             result = answer_with_image(prompt, image_url)
         else:
             result = answer([{"role": "user", "content": prompt}])
+    except HTTPException:
+        raise
     except Exception as exc:
         # Registra o motivo técnico sem expor credenciais nos logs.
         detail = str(exc)
