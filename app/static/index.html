@@ -32,6 +32,21 @@
       <small id="currentConversationLabel" class="connector-note">Nenhuma conversa selecionada</small>
       <div id="messages" class="messages"><div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div></div>
       <div id="workStatus" class="work-status hidden" aria-live="polite"></div>
+      <section id="longWorkPanel" class="long-work-panel" aria-label="Trabalho prolongado">
+        <div class="long-work-heading"><b>Trabalho prolongado</b><small>Peça à Mikael AI para trabalhar por até 3 horas. Se a aba for suspensa, o trabalho será pausado e poderá ser retomado.</small></div>
+        <textarea id="workGoal" rows="2" maxlength="12000" placeholder="Descreva o projeto e o que a IA deve fazer..."></textarea>
+        <div class="long-work-controls">
+          <select id="workDuration" aria-label="Duração do trabalho">
+            <option value="1800">30 minutos</option><option value="3600">1 hora</option><option value="7200">2 horas</option><option value="10800" selected>3 horas</option>
+          </select>
+          <button id="startLongWork" class="primary" type="button">Iniciar trabalho</button>
+        </div>
+        <div id="longWorkStatus" class="long-work-status hidden" aria-live="polite">
+          <b id="longWorkState">Preparando...</b><span id="longWorkTime">Tempo restante: --</span>
+          <p id="longWorkProgress"></p>
+          <div class="long-work-actions"><button id="pauseLongWork" class="outline" type="button">Pausar</button><button id="resumeLongWork" class="primary" type="button">Continuar</button><button id="cancelLongWork" class="outline" type="button">Cancelar</button></div>
+        </div>
+      </section>
       <div class="model-picker"><label for="modelSelect">Modelo de IA</label><select id="modelSelect" aria-label="Selecionar modelo de inteligência artificial"><option value="mikael">Mikael AI</option><option value="deepseek">DeepSeek V4.1 Flash</option><option value="gpt4o_mini">GPT-4o mini</option></select></div>
       <div class="composer"><button id="attachBtn" class="attach-btn" type="button" aria-label="Anexar arquivo ou imagem" title="Enviar arquivo ou imagem">＋</button><button id="imageGenBtn" class="image-gen-btn" type="button" aria-label="Gerar imagem com IA" title="Gerar imagem com IA">✧</button><input id="chatFileInput" type="file" accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.jsx,.tsx,.java,.kt,.json,.yaml,.yml,.xml,.html,.css,.scss,.gradle,.properties,.toml,.log,.csv,.sql,.sh,.c,.cpp,.h,.cs,.go,.rs,.php,.rb,.jpg,.jpeg,.png,.webp,.gif,image/*" multiple hidden><textarea id="prompt" rows="2" placeholder="Pergunte sobre código, bugs ou projetos..."></textarea><button id="sendBtn" aria-label="Enviar">↑</button></div>
       <small class="hint">A IA pode cometer erros. Revise alterações antes de usar em produção.</small>
