@@ -242,7 +242,9 @@ class ConnectorSecurityTests(unittest.TestCase):
             def query(self, model):
                 self.asserted_model = model
                 return FakeQuery()
-        self.assertEqual(connector_tools(FakeDB()), [])
+        names = {x["function"]["name"] for x in connector_tools(FakeDB())}
+        self.assertFalse(any(name.startswith("github_") or name.startswith("mcp_") for name in names))
+        self.assertIn("workspace_list_files", names)
 
     def test_connector_has_enabled_flag_defaulting_to_true(self):
         self.assertIn("enabled", Connector.__table__.columns)
