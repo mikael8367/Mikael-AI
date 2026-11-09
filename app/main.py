@@ -311,6 +311,14 @@ def list_files(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     return [{"id": f.id, "filename": f.filename, "characters": len(f.extracted_text), "is_image": bool(f.mime_type and f.mime_type.startswith("image/"))} for f in rows]
 
 
+@app.get("/api/files/{file_id}/preview")
+def preview_image(file_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(UploadedFile, file_id)
+    if not item or not item.mime_type or not item.mime_type.startswith("image/") or not item.file_data:
+        raise HTTPException(404, "Imagem não encontrada.")
+    return Response(content=item.file_data, media_type=item.mime_type, headers={"Cache-Control": "private, max-age=3600"})
+
+
 @app.get("/api/files/{file_id}")
 def get_file(file_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
     f = db.get(UploadedFile, file_id)
