@@ -75,6 +75,15 @@ def me(_: None = Depends(require_auth)):
     return {"name": "Mikael AI", "authenticated": True}
 
 
+@app.post("/api/conversations")
+def create_conversation(_: None = Depends(require_auth), db: Session = Depends(get_db)):
+    conversation = Conversation(title="Nova conversa")
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return {"id": conversation.id, "title": conversation.title}
+
+
 @app.get("/api/conversations")
 def conversations(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(
