@@ -64,20 +64,23 @@ async function loadConnectors(){
     const rows=await api('/api/connectors');
     list.innerHTML='';
     const github=rows.find(x=>x.provider==='github');
-    $('githubStatus').textContent=github?'Conectado como @'+github.account:'Ainda não há uma conta GitHub conectada.';
+    $('githubStatus').textContent=github?(github.enabled?'Conectado e ativo como @':'Conectado, mas desativado · @')+github.account:'Ainda não há uma conta GitHub conectada.';
     if(!rows.length){list.textContent='Nenhum conector conectado.';return}
     rows.forEach(item=>{
-      const card=document.createElement('div');card.className='list-item connector-item';
+      const card=document.createElement('article');card.className='list-item connector-item'+(item.enabled?'':' connector-disabled');
       const info=document.createElement('div');info.className='connector-info';
-      const name=document.createElement('b');name.textContent=item.name;
-      const detail=document.createElement('small');detail.textContent=(item.provider==='github'?'GitHub · @'+item.account:'MCP · '+(item.account||item.endpoint));
+      const name=document.createElement('b');name.textContent=item.name||'Conector sem nome';
+      const detail=document.createElement('small');
+      detail.textContent=(item.provider==='github'?'GitHub · @'+(item.account||'conta'):'MCP · '+(item.account||item.endpoint||'servidor'))+' · '+(item.enabled?'Ativo':'Desativado');
       info.append(name,detail);
       const actions=document.createElement('div');actions.className='connector-actions';
-      const test=document.createElement('button');test.type='button';test.textContent='Testar';
-      test.onclick=async()=>{test.disabled=true;test.textContent='Testando...';try{const result=await api('/api/connectors/'+item.id+'/test',{method:'POST'});toast('Conexão válida · '+(result.account||'OK'))}catch(e){toast('Falha no teste: '+e.message)}finally{test.disabled=false;test.textContent='Testar'}};
-      const remove=document.createElement('button');remove.type='button';remove.textContent='Desconectar';
-      remove.onclick=async()=>{const allowed=await confirmInApp('Desconectar conector?',item.name+' · '+(item.provider==='github'?'A Mikael AI perderá o acesso à sua conta GitHub.':'A Mikael AI perderá o acesso a este servidor MCP.'),'Desconectar','Cancelar');if(!allowed)return;remove.disabled=true;try{await api('/api/connectors/'+item.id,{method:'DELETE'});await loadConnectors();toast('Conector desconectado')}catch(e){toast(e.message);remove.disabled=false}};
-      actions.append(test,remove);card.append(info,actions);list.append(card);
+      const toggle=document.createElement('button');toggle.type='button';toggle.textContent=item.enabled?'Desabilitar':'Habilitar';toggle.setAttribute('aria-pressed',item.enabled?'true':'false');
+      toggle.onclick=async()=>{toggle.disabled=true;const old=toggle.textContent;toggle.textContent='Salvando...';try{const result=await api('/api/connectors/'+item.id+'/enabled',{method:'PATCH',body:JSON.stringify({enabled:!item.enabled})});if(result.enabled!==!item.enabled)throw new Error('O servidor não confirmou o novo estado.');await loadConnectors();toast(result.enabled?'Conector habilitado.':'Conector desabilitado.')}catch(e){toast('Não foi possível alterar o conector: '+e.message);toggle.disabled=false;toggle.textContent=old}};
+      const test=document.createElement('button');test.type='button';test.textContent='Testar';test.disabled=!item.enabled;
+      test.onclick=async()=>{test.disabled=true;const old=test.textContent;test.textContent='Testando...';try{const result=await api('/api/connectors/'+item.id+'/test',{method:'POST'});toast('Conexão válida · '+(result.account||'OK'))}catch(e){toast('Falha no teste: '+e.message)}finally{test.disabled=!item.enabled;test.textContent=old}};
+      const remove=document.createElement('button');remove.type='button';remove.textContent='Excluir';remove.className='danger-outline';
+      remove.onclick=async()=>{const detail=item.provider==='github'?'A autorização GitHub salva para @'+(item.account||'sua conta')+' será removida deste app. A autorização concedida no GitHub não será revogada automaticamente.':'O servidor MCP '+item.name+' e seu token salvo serão removidos deste app.';const allowed=await confirmInApp('Excluir conector?',detail,'Excluir conector','Cancelar');if(!allowed)return;remove.disabled=true;remove.textContent='Excluindo...';try{await api('/api/connectors/'+item.id,{method:'DELETE'});await loadConnectors();toast('Conector excluído.')}catch(e){toast('Não foi possível excluir: '+e.message);remove.disabled=false;remove.textContent='Excluir'}};
+      actions.append(toggle,test,remove);card.append(info,actions);list.append(card);
     });
   }catch(e){list.textContent='Não foi possível carregar os conectores.';toast(e.message)}
 }
