@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07110d"><title>Mikael AI</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=__APP_VERSION__">
 </head>
 <body>
 <div id="login" class="login-wrap">
@@ -87,7 +87,7 @@
     <span class="eyebrow">CONFIRMAÇÃO DE SEGURANÇA</span>
     <h2 id="approvalTitle">Confirmar ação</h2>
     <p id="approvalDescription"></p>
-    <small id="approvalWarning">A ação só será executada depois da sua autorização.</small>
+    <small id="approvalWarning">A exclusão será permanente no repositório. Nada será apagado sem sua aprovação nesta janela.</small>
     <div class="approval-actions">
       <button id="approvalDeny" class="outline" type="button">Negar</button>
       <button id="approvalAllow" class="danger-button" type="button">Permitir</button>
@@ -95,5 +95,5 @@
   </section>
 </div>
 <div id="toast" class="toast"></div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=__APP_VERSION__"></script>
 </body></html>
