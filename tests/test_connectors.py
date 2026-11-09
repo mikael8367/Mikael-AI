@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi import HTTPException
 
-from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool
+from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools
 from app.models import PendingAction, Connector
 
 
@@ -84,6 +84,17 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertEqual(json.loads(db.action.arguments)["sha"], "blob-sha-123")
         self.assertEqual(request.call_count, 1)
         self.assertEqual(request.call_args.kwargs.get("method", "GET"), "GET")
+
+    def test_disabled_connector_does_not_expose_tools(self):
+        disabled = SimpleNamespace(provider="github", enabled=False)
+        class FakeQuery:
+            def all(self):
+                return [disabled]
+        class FakeDB:
+            def query(self, model):
+                self.asserted_model = model
+                return FakeQuery()
+        self.assertEqual(connector_tools(FakeDB()), [])
 
     def test_connector_has_enabled_flag_defaulting_to_true(self):
         self.assertIn("enabled", Connector.__table__.columns)
