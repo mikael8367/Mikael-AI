@@ -56,3 +56,26 @@ def answer_with_image(prompt, image_data_url):
         temperature=0.2,
     )
     return response.choices[0].message.content or "Não consegui analisar essa imagem."
+
+
+def generate_image(prompt):
+    """Gera uma imagem via OpenRouter e retorna (data_url, texto_auxiliar)."""
+    model = (os.getenv("LLM_IMAGE_MODEL") or "google/gemini-2.5-flash-image").strip()
+    response = get_client().chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body={"modalities": ["image", "text"]},
+        temperature=0.7,
+    )
+    payload = response.model_dump()
+    choices = payload.get("choices") or []
+    if not choices:
+        raise RuntimeError("O provedor não retornou uma resposta.")
+    message = choices[0].get("message") or {}
+    images = message.get("images") or []
+    if not images:
+        raise RuntimeError("O modelo configurado não retornou imagem. Confira LLM_IMAGE_MODEL no Render.")
+    image_url = (images[0].get("image_url") or {}).get("url")
+    if not isinstance(image_url, str) or not image_url.startswith("data:image/"):
+        raise RuntimeError("O provedor retornou um formato de imagem inválido.")
+    return image_url, (message.get("content") or "")
