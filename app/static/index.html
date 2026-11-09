@@ -29,6 +29,7 @@
       <div class="section-head"><h3>Histórico</h3></div>
       <div id="conversationList" class="list"></div>
       <div id="messages" class="messages"><div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div></div>
+      <div class="model-picker"><label for="modelSelect">Modelo de IA</label><select id="modelSelect" aria-label="Selecionar modelo de inteligência artificial"><option value="mikael">Mikael AI</option><option value="deepseek">DeepSeek V4.1 Flash</option><option value="gpt4o_mini">GPT-4o mini</option></select></div>
       <div class="composer"><button id="attachBtn" class="attach-btn" type="button" aria-label="Anexar arquivo ou imagem" title="Enviar arquivo ou imagem">＋</button><button id="imageGenBtn" class="image-gen-btn" type="button" aria-label="Gerar imagem com IA" title="Gerar imagem com IA">✧</button><input id="chatFileInput" type="file" accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.jsx,.tsx,.java,.kt,.json,.yaml,.yml,.xml,.html,.css,.scss,.gradle,.properties,.toml,.log,.csv,.sql,.sh,.c,.cpp,.h,.cs,.go,.rs,.php,.rb,.jpg,.jpeg,.png,.webp,.gif,image/*" multiple hidden><textarea id="prompt" rows="2" placeholder="Pergunte sobre código, bugs ou projetos..."></textarea><button id="sendBtn" aria-label="Enviar">↑</button></div>
       <small class="hint">A IA pode cometer erros. Revise alterações antes de usar em produção.</small>
     </section>
@@ -52,7 +53,7 @@
       <div class="section-head"><div><span class="eyebrow">PREFERÊNCIAS</span><h2>Configurações</h2></div></div>
       <div class="setting-card"><b>Memória da Mikael AI</b><p>Salve informações úteis sobre seus projetos para reutilizar em conversas futuras.</p><textarea id="memoryText" rows="3" placeholder="Ex.: Meu projeto usa Java 8 e Forge 1.12.2..."></textarea><button id="saveMemory" class="primary">Salvar memória</button></div>
       <div id="memoryList" class="list"></div>
-      <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão <span id="aboutVersion">__APP_VERSION__</span><br>Backend próprio, banco persistente e modelo LLM configurável.</p></div>
+      <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão <span id="aboutVersion">__APP_VERSION__</span><br>Backend próprio, banco persistente e seleção de modelos de IA.</p></div>
     </section>
   </main>
   <nav class="bottom-nav">
