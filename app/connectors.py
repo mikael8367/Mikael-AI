@@ -181,7 +181,8 @@ def connector_tools(db):
                     original = tool.get("name")
                     if not isinstance(original, str) or not original:
                         continue
-                    safe = "".join(ch if ch.isalnum() else "_" for ch in original)[:50]
+                    import hashlib
+                    safe = hashlib.sha256(original.encode()).hexdigest()[:12]
                     name = "mcp_%s_%s" % (connector.id, safe)
                     tools.append({"type": "function", "function": {
                         "name": name,
@@ -233,8 +234,13 @@ def execute_connector_tool(name: str, arguments: dict, db):
         if not item:
             return {"error": "Conector MCP não encontrado."}
         token = decrypt_secret(item.secret) if item.secret else None
-        # Revalida endpoint a cada chamada para reduzir risco de SSRF.
-        result = _mcp_call(item.endpoint, token, "tools/call", {"name": arguments.pop("__tool_name", parts[2]), "arguments": arguments})
+        # Resolve o nome original consultando novamente o servidor, sem confiar no modelo.
+        listed = _mcp_call(item.endpoint, token, "tools/list")
+        import hashlib
+        original = next((tool.get("name") for tool in (listed.get("tools") or []) if isinstance(tool, dict) and hashlib.sha256(str(tool.get("name", "")).encode()).hexdigest()[:12] == parts[2]), None)
+        if not original:
+            return {"error": "A ferramenta não existe mais no servidor MCP."}
+        result = _mcp_call(item.endpoint, token, "tools/call", {"name": original, "arguments": arguments})
         return result
     return {"error": "Ferramenta desconhecida."}
 
