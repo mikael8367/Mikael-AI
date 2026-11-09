@@ -52,26 +52,43 @@ OBJETIVO
 Entregar soluções corretas, sustentáveis e compatíveis com o projeto real, com verificação proporcional e comunicação honesta. Não revele raciocínio interno privado; apresente conclusões, evidências e justificativas úteis.
 """
 
+def _provider():
+    provider = (os.getenv("LLM_PROVIDER") or "openrouter").strip().lower()
+    if provider not in {"openrouter", "local"}:
+        raise RuntimeError("LLM_PROVIDER inválido. Use 'openrouter' ou 'local'.")
+    return provider
+
+
 def get_client():
-    # Remove espaços acidentais e aceita a chave colada com prefixo Bearer.
-    key = (os.getenv("LLM_API_KEY") or "").strip()
-    if key.lower().startswith("bearer "):
-        key = key[7:].strip()
-    if not key or key.lower() in {"sua-chave-do-provedor", "your-api-key", "none", "null"}:
-        raise RuntimeError(
-            "LLM_API_KEY está vazia ou contém um valor de exemplo. "
-            "Configure a chave secreta do provedor nas variáveis do serviço Render."
-        )
-    base_url = (os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1").strip()
-    return OpenAI(
-        api_key=key,
-        base_url=base_url,
-        timeout=90,
-        max_retries=2,
-    )
+    provider = _provider()
+    if provider == "local":
+        # Configuração separada impede fallback silencioso para a OpenRouter.
+        base_url = (os.getenv("LLM_LOCAL_BASE_URL") or "").strip()
+        if not base_url:
+            raise RuntimeError(
+                "O motor local ainda não foi conectado. Configure LLM_LOCAL_BASE_URL "
+                "com a URL HTTPS do servidor próprio compatível com a API OpenAI."
+            )
+        key = (os.getenv("LLM_LOCAL_API_KEY") or "").strip() or "local-no-auth"
+        timeout = 300
+    else:
+        key = (os.getenv("LLM_API_KEY") or "").strip()
+        if key.lower().startswith("bearer "):
+            key = key[7:].strip()
+        if not key or key.lower() in {"sua-chave-do-provedor", "your-api-key", "none", "null"}:
+            raise RuntimeError(
+                "LLM_API_KEY está vazia ou contém um valor de exemplo. "
+                "Configure a chave secreta do provedor nas variáveis do serviço Render."
+            )
+        base_url = (os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1").strip()
+        timeout = 90
+
+    return OpenAI(api_key=key, base_url=base_url, timeout=timeout, max_retries=2)
 
 def _web_search_tools():
     """Habilita a busca do OpenRouter apenas quando configurada e disponível."""
+    if _provider() != "openrouter":
+        return []
     enabled = (os.getenv("LLM_WEB_SEARCH_ENABLED") or "true").strip().lower()
     base_url = (os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1").strip()
     if enabled not in {"1", "true", "yes", "on"}:
@@ -130,7 +147,20 @@ MODEL_PRESETS = {
 def answer(messages, model_id="mikael", external_tools=None, tool_executor=None, progress_callback=None):
     if model_id not in MODEL_PRESETS:
         raise ValueError("Modelo de IA inválido.")
-    model = MODEL_PRESETS[model_id] or (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
+    provider = _provider()
+    if provider == "local":
+        if model_id != "mikael":
+            raise RuntimeError(
+                "No modo de motor próprio, selecione Mikael AI. Modelos externos pagos "
+                "ficam bloqueados para evitar cobranças acidentais."
+            )
+        model = (os.getenv("LLM_LOCAL_MODEL") or "").strip()
+        if not model:
+            raise RuntimeError("Configure LLM_LOCAL_MODEL com o nome publicado pelo servidor local.")
+    else:
+        if model_id == "local":
+            raise RuntimeError("O modelo próprio só funciona quando LLM_PROVIDER=local.")
+        model = MODEL_PRESETS[model_id] or (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
     effort = (os.getenv("LLM_REASONING_EFFORT") or "high").strip().lower()
     if effort not in {"low", "medium", "high"}:
         effort = "high"
@@ -140,13 +170,15 @@ def answer(messages, model_id="mikael", external_tools=None, tool_executor=None,
     if progress_callback:
         progress_callback("Entendi o pedido. Estou preparando a análise e verificando as ferramentas disponíveis.")
     for _ in range(5):
-        response = client.chat.completions.create(
-            model=model,
-            messages=conversation,
-            tools=tools or None,
-            extra_body={"reasoning": {"effort": effort}},
-            temperature=0.25,
-        )
+        request_args = {
+            "model": model,
+            "messages": conversation,
+            "tools": tools or None,
+            "temperature": 0.25,
+        }
+        if provider == "openrouter":
+            request_args["extra_body"] = {"reasoning": {"effort": effort}}
+        response = client.chat.completions.create(**request_args)
         message = response.choices[0].message
         calls = getattr(message, "tool_calls", None) or []
         if not calls:
@@ -198,7 +230,12 @@ def answer(messages, model_id="mikael", external_tools=None, tool_executor=None,
 
 def answer_with_image(prompt, image_data_url):
     """Analisa uma imagem usando um modelo com suporte a visão configurável."""
-    model = (os.getenv("LLM_VISION_MODEL") or "openai/gpt-4o-mini").strip()
+    if _provider() == "local":
+        model = (os.getenv("LLM_LOCAL_VISION_MODEL") or "").strip()
+        if not model:
+            raise RuntimeError("O servidor local ainda não tem um modelo de visão configurado.")
+    else:
+        model = (os.getenv("LLM_VISION_MODEL") or "openai/gpt-4o-mini").strip()
     response = get_client().chat.completions.create(
         model=model,
         messages=[
@@ -215,6 +252,11 @@ def answer_with_image(prompt, image_data_url):
 
 def generate_image(prompt):
     """Gera uma imagem via OpenRouter e retorna (data_url, texto_auxiliar)."""
+    if _provider() == "local":
+        raise RuntimeError(
+            "Geração de imagens ainda não está disponível no motor local. "
+            "Ela foi bloqueada para impedir uso acidental da OpenRouter."
+        )
     model = (os.getenv("LLM_IMAGE_MODEL") or "google/gemini-2.5-flash-image").strip()
     response = get_client().chat.completions.create(
         model=model,
