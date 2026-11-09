@@ -17,7 +17,7 @@ from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -158,7 +158,7 @@ def github_oauth_start(_: None = Depends(require_auth)):
     redirect_uri = (os.getenv("GITHUB_REDIRECT_URI") or "https://mikael-ai.onrender.com/api/connectors/github/callback").strip()
     from urllib.parse import urlencode
     url = "https://github.com/login/oauth/authorize?" + urlencode({
-        "client_id": client_id, "redirect_uri": redirect_uri, "scope": "read:user repo", "state": state
+        "client_id": client_id, "redirect_uri": redirect_uri, "scope": "read:user repo workflow", "state": state
     })
     response = RedirectResponse(url, status_code=302)
     response.set_cookie("mikael_github_oauth_state", state, httponly=True, secure=True, samesite="lax", max_age=600, path="/")
