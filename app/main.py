@@ -7,18 +7,28 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, inspect, text
 from pypdf import PdfReader
 from docx import Document
 
 from .db import Base, engine, get_db
 from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
-from .llm import answer
+from .llm import answer, answer_with_image
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 Base.metadata.create_all(bind=engine)
+
+# Adiciona colunas de arquivos sem apagar dados existentes.
+with engine.begin() as connection:
+    columns = {column["name"] for column in inspect(connection).get_columns("uploaded_files")}
+    binary_type = "BYTEA" if engine.dialect.name == "postgresql" else "BLOB"
+    if "file_data" not in columns:
+        connection.execute(text(f"ALTER TABLE uploaded_files ADD COLUMN file_data {binary_type}"))
+    if "mime_type" not in columns:
+        connection.execute(text("ALTER TABLE uploaded_files ADD COLUMN mime_type VARCHAR(120)"))
+
 app = FastAPI(title="Mikael AI", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -191,11 +201,14 @@ ALLOWED = {
     ".json", ".yaml", ".yml", ".xml", ".html", ".css", ".scss", ".gradle",
     ".properties", ".toml", ".log", ".csv", ".sql", ".sh", ".c", ".cpp", ".h",
     ".cs", ".go", ".rs", ".php", ".rb", ".pdf", ".docx",
+    ".jpg", ".jpeg", ".png", ".webp", ".gif",
 }
 
 
 def extract_text(name: str, raw: bytes) -> str:
     ext = Path(name).suffix.lower()
+    if ext in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        return ""
     if ext == ".pdf":
         reader = PdfReader(BytesIO(raw))
         return "\n".join(page.extract_text() or "" for page in reader.pages)
@@ -213,21 +226,35 @@ async def upload(
     name = Path(file.filename or "arquivo").name
     ext = Path(name).suffix.lower()
     if ext not in ALLOWED:
-        raise HTTPException(415, "Formato não permitido. Envie código, texto, PDF ou DOCX.")
+        raise HTTPException(415, "Formato não permitido. Envie código, texto, PDF, DOCX ou fotos JPG, PNG, WEBP e GIF.")
     limit = int(os.getenv("MAX_UPLOAD_MB", "8")) * 1024 * 1024
     raw = await file.read(limit + 1)
     await file.close()
     if len(raw) > limit:
         raise HTTPException(413, f"Arquivo excede o limite de {limit // (1024 * 1024)} MB.")
+    image_types = {
+        ".jpg": ("image/jpeg", raw.startswith(bytes([255, 216, 255]))),
+        ".jpeg": ("image/jpeg", raw.startswith(bytes([255, 216, 255]))),
+        ".png": ("image/png", raw.startswith(bytes([137, 80, 78, 71, 13, 10, 26, 10]))),
+        ".webp": ("image/webp", raw.startswith(b"RIFF") and raw[8:12] == b"WEBP"),
+        ".gif": ("image/gif", raw.startswith((b"GIF87a", b"GIF89a"))),
+    }
+    mime_type = None
+    if ext in image_types:
+        mime_type, valid_image = image_types[ext]
+        if not valid_image:
+            raise HTTPException(400, "O conteúdo enviado não corresponde a uma imagem válida.")
+        if len(raw) > 5 * 1024 * 1024:
+            raise HTTPException(413, "Fotos têm limite de 5 MB para análise pela IA.")
     try:
-        text = extract_text(name, raw)[:250000]
+        extracted = extract_text(name, raw)[:250000]
     except Exception:
         raise HTTPException(400, "Não foi possível ler esse arquivo.")
-    item = UploadedFile(filename=name, extracted_text=text)
+    item = UploadedFile(filename=name, extracted_text=extracted, file_data=raw, mime_type=mime_type)
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "filename": name, "characters": len(text)}
+    return {"id": item.id, "filename": name, "characters": len(extracted), "is_image": bool(mime_type)}
 
 
 @app.post("/api/files/generate")
@@ -257,7 +284,7 @@ def generate_file(
         raise HTTPException(502, "A IA retornou um arquivo vazio. Tente novamente.")
     if len(content.encode("utf-8")) > 1024 * 1024:
         raise HTTPException(413, "O arquivo gerado excedeu o limite de 1 MB.")
-    item = UploadedFile(filename=filename, extracted_text=content)
+    item = UploadedFile(filename=filename, extracted_text=content, file_data=content.encode("utf-8"), mime_type="text/plain; charset=utf-8")
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -269,10 +296,11 @@ def download_file(file_id: int, _: None = Depends(require_auth), db: Session = D
     item = db.get(UploadedFile, file_id)
     if not item:
         raise HTTPException(404, "Arquivo não encontrado.")
-    safe_name = Path(item.filename).name.replace('"', "")
+    safe_name = Path(item.filename).name.replace('"', "").replace("\r", "").replace("\n", "")
+    payload = item.file_data if item.file_data is not None else item.extracted_text.encode("utf-8")
     return Response(
-        content=item.extracted_text,
-        media_type="text/plain; charset=utf-8",
+        content=payload,
+        media_type=item.mime_type or "text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
     )
 
@@ -280,7 +308,7 @@ def download_file(file_id: int, _: None = Depends(require_auth), db: Session = D
 @app.get("/api/files")
 def list_files(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(select(UploadedFile).order_by(UploadedFile.id.desc()).limit(100)).all()
-    return [{"id": f.id, "filename": f.filename, "characters": len(f.extracted_text)} for f in rows]
+    return [{"id": f.id, "filename": f.filename, "characters": len(f.extracted_text), "is_image": bool(f.mime_type and f.mime_type.startswith("image/"))} for f in rows]
 
 
 @app.get("/api/files/{file_id}")
@@ -297,12 +325,20 @@ def analyze_file(file_id: int, _: None = Depends(require_auth), db: Session = De
     if not f:
         raise HTTPException(404, "Arquivo não encontrado.")
     prompt = (
-        "Analise este arquivo como engenheira de software. Explique sua função, "
-        "riscos, bugs prováveis e melhorias. Não execute o conteúdo.\n\n"
+        "Analise este arquivo como uma especialista. Se for uma imagem, descreva objetivamente "
+        "o que está visível e leia textos que conseguir identificar. Se for código ou documento, "
+        "explique sua função, riscos, bugs prováveis e melhorias. Não execute nenhum conteúdo.\n\n"
         f"ARQUIVO: {f.filename}\nCONTEÚDO:\n{f.extracted_text[:50000]}"
     )
     try:
-        result = answer([{"role": "user", "content": prompt}])
+        if f.mime_type and f.mime_type.startswith("image/"):
+            if not f.file_data:
+                raise HTTPException(410, "A imagem antiga não possui os dados originais. Envie-a novamente.")
+            import base64
+            image_url = f"data:{f.mime_type};base64,{base64.b64encode(f.file_data).decode('ascii')}"
+            result = answer_with_image(prompt, image_url)
+        else:
+            result = answer([{"role": "user", "content": prompt}])
     except Exception as exc:
         # Registra o motivo técnico sem expor credenciais nos logs.
         detail = str(exc)
