@@ -11,7 +11,7 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Instruções avançadas de engenharia de software, depuração e revisão de código.
 - Modelo DeepSeek V4.1 Flash com nível de raciocínio configurável.
 - Pesquisa na web sob demanda pelo OpenRouter, com links das fontes incluídos nas respostas.
-- Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
+- Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.\n- Conector GitHub por OAuth, com leitura de repositórios, arquivos e issues.\n- Cadastro de servidores MCP remotos por HTTPS, com segredo armazenado criptografado e exposição limitada a ferramentas aparentemente somente de leitura.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
 - Health check em `/health`, incluindo a versão atual.
@@ -26,7 +26,7 @@ A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao 
 
 ## Limites desta versão
 - A IA não treina os pesos do modelo com conversas. O sistema guarda memórias e histórico para recuperar contexto.
-- A aba Projetos é a área inicial; integração GitHub, edição real de repositórios, execução de testes em sandbox e busca vetorial avançada são próximas etapas.
+- A aba Projetos ainda é uma área inicial; escrita/edição de repositórios, execução de código em sandbox e busca vetorial avançada não estão habilitadas.
 - Arquivos são analisados como texto. O servidor não executa código enviado.
 - O plano gratuito do Render pode dormir por inatividade e os limites de banco/serviço podem mudar. Verifique os limites atuais antes de publicar.
 
@@ -36,6 +36,28 @@ A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao 
 3. O Render lerá `render.yaml` e criará o serviço e o banco.
 4. Em Environment, preencha `APP_PASSWORD` com uma senha forte e `LLM_API_KEY` com a chave do provedor.
 5. Confira `LLM_BASE_URL` e `LLM_MODEL`, faça o deploy e abra a URL `onrender.com` no navegador do celular.
+
+## Conectores GitHub e MCP
+
+A tela Configurações permite conectar o GitHub e cadastrar servidores MCP remotos.
+
+### Configurar OAuth do GitHub
+1. Abra https://github.com/settings/developers no navegador e entre em **OAuth Apps**.
+2. Crie uma OAuth App chamada Mikael AI.
+3. Em **Homepage URL**, use https://mikael-ai.onrender.com.
+4. Em **Authorization callback URL**, use exatamente https://mikael-ai.onrender.com/api/connectors/github/callback.
+5. Copie o Client ID e gere um Client Secret.
+6. No Render, abra Environment do serviço e configure `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET`. Configure `GITHUB_REDIRECT_URI` com a URL de callback acima.
+7. Abra Configurações no site e toque em **Conectar conta GitHub**.
+
+A autorização solicita `read:user` e `repo` para permitir leitura de repositórios privados e públicos. Embora o escopo OAuth `repo` seja amplo, as ferramentas atualmente expostas pela Mikael AI são somente de leitura: listar repositórios, ler arquivos e listar issues. Não há ferramentas de escrita, exclusão ou criação de commits.
+
+### Adicionar um servidor MCP
+Informe nome, URL HTTPS pública do endpoint MCP Streamable HTTP e, se necessário, um token Bearer no campo próprio. O token é criptografado no servidor usando uma chave derivada de `APP_SECRET`; não é enviado de volta ao navegador. Não cole senhas de conta nem tokens no chat. Por segurança, endpoints locais, HTTP simples e IPs privados são rejeitados. Ferramentas MCP são filtradas para expor apenas nomes que aparentam ser de leitura; isso não substitui a revisão das permissões e da confiabilidade do servidor.
+
+Desconectar remove a credencial armazenada pela Mikael AI, mas não revoga automaticamente a autorização na plataforma externa. Para revogar completamente o GitHub, remova o acesso em https://github.com/settings/applications.
+
+**Importante:** mantenha `APP_SECRET` estável. Se ela for alterada, os tokens criptografados anteriormente não poderão ser descriptografados; será necessário reconectar os serviços.
 
 ## Geração de imagens
 A geração usa a mesma `LLM_API_KEY` do OpenRouter e o modelo definido em `LLM_IMAGE_MODEL` (padrão: `google/gemini-2.5-flash-image`). A geração de imagens pode consumir créditos e não deve ser considerada gratuita. O usuário descreve a imagem no campo da conversa e toca no botão ✧. A imagem é salva em Arquivos.
