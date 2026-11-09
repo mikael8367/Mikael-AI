@@ -287,7 +287,10 @@ def execute_connector_tool(name: str, arguments: dict, db):
             if not isinstance(current, dict) or current.get("type") != "file" or not isinstance(current.get("sha"), str):
                 return {"error": "O caminho informado não corresponde a um arquivo único que possa ser confirmado."}
             safe_args = {"owner": owner, "repo": repo, "path": current.get("path") or path, "message": message[:180], "branch": branch if isinstance(branch, str) else "", "sha": current["sha"]}
-            pending = db.query(PendingAction).filter_by(status="pending").count()
+            pending = db.query(PendingAction).filter(
+                PendingAction.status == "pending",
+                PendingAction.expires_at > int(time.time())
+            ).count()
             if pending >= 10:
                 return {"error": "Há muitas exclusões aguardando aprovação. Aprove ou negue as solicitações existentes primeiro."}
             import time
