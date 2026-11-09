@@ -8,9 +8,17 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Memórias manuais persistidas no banco e recuperadas por correspondência de palavras.
 - Upload e extração de texto de código, PDF e DOCX.
 - Análise de arquivos pelo modelo (sem executar os arquivos).
-- Interface mobile com abas inferiores animadas.
+- Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
-- Health check em `/health`.
+- Health check em `/health`, incluindo a versão atual.
+
+## Versionamento
+A versão segue o padrão `MAJOR.MINOR.PATCH`:
+- **PATCH** (ex.: `1.0.1`): correções de bugs e ajustes pequenos sem adicionar funcionalidades.
+- **MINOR** (ex.: `1.1.0`): novos recursos mantendo compatibilidade.
+- **MAJOR** (ex.: `2.0.0`): mudanças grandes que alteram significativamente o funcionamento ou quebram compatibilidade.
+
+A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
 
 ## Limites desta versão
 - A IA não treina os pesos do modelo com conversas. O sistema guarda memórias e histórico para recuperar contexto.
