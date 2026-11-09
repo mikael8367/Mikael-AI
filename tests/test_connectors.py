@@ -68,6 +68,11 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertEqual(_connector_permissions(connector), set())
         self.assertFalse(_connector_tool_enabled(connector, "github_read_file"))
 
+    def test_malformed_permissions_fail_closed(self):
+        connector = SimpleNamespace(tool_permissions='{"unexpected":"value"}')
+        self.assertEqual(_connector_permissions(connector), set())
+        self.assertFalse(_connector_tool_enabled(connector, "github_read_file"))
+
     def test_expanded_github_catalog_contains_code_search_and_branch_tools(self):
         names = {tool["name"] for tool in GITHUB_TOOL_SPECS}
         self.assertIn("github_search_code", names)
