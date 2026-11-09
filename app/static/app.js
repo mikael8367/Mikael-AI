@@ -69,10 +69,14 @@ async function loadConnectors(){
     rows.forEach(item=>{
       const card=document.createElement('article');card.className='list-item connector-item'+(item.enabled?'':' connector-disabled');
       const info=document.createElement('div');info.className='connector-info';
+      const identity=document.createElement('div');identity.className='connector-identity';
+      const avatar=document.createElement('div');avatar.className='connector-avatar';
+      if(item.provider==='github'&&item.avatar_url){const photo=document.createElement('img');photo.src=item.avatar_url;photo.alt='Foto do perfil GitHub de '+(item.account||'usuário');photo.loading='lazy';photo.referrerPolicy='no-referrer';photo.onerror=()=>{photo.remove();avatar.textContent='GH'};avatar.append(photo)}else{avatar.textContent=item.provider==='github'?'GH':'MCP'}
+      const identityText=document.createElement('div');identityText.className='connector-identity-text';
       const name=document.createElement('b');name.textContent=item.name||'Conector sem nome';
       const detail=document.createElement('small');
       detail.textContent=(item.provider==='github'?'GitHub · @'+(item.account||'conta'):'MCP · '+(item.account||item.endpoint||'servidor'))+' · '+(item.enabled?'Ativo':'Desativado');
-      info.append(name,detail);
+      identityText.append(name,detail);identity.append(avatar,identityText);info.append(identity);
       const actions=document.createElement('div');actions.className='connector-actions';
       const toggle=document.createElement('button');toggle.type='button';toggle.textContent=item.enabled?'Desabilitar':'Habilitar';toggle.setAttribute('aria-pressed',item.enabled?'true':'false');
       toggle.onclick=async()=>{toggle.disabled=true;const old=toggle.textContent;toggle.textContent='Salvando...';try{const result=await api('/api/connectors/'+item.id+'/enabled',{method:'PATCH',body:JSON.stringify({enabled:!item.enabled})});if(result.enabled!==!item.enabled)throw new Error('O servidor não confirmou o novo estado.');await loadConnectors();toast(result.enabled?'Conector habilitado.':'Conector desabilitado.')}catch(e){toast('Não foi possível alterar o conector: '+e.message);toggle.disabled=false;toggle.textContent=old}};
