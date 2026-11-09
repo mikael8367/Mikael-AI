@@ -117,7 +117,7 @@ def get_conversation(
     return {
         "id": c.id,
         "title": c.title,
-        "messages": [{"role": m.role, "content": m.content} for m in c.messages],
+        "messages": [{"role": m.role, "content": m.content} for m in sorted(c.messages, key=lambda message: message.id)],
     }
 
 
@@ -131,6 +131,10 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
         db.add(c)
         db.commit()
         db.refresh(c)
+
+    if c.title == "Nova conversa":
+        c.title = body.message.strip()[:55] or "Nova conversa"
+        db.add(c)
 
     recent = db.scalars(
         select(Message)
@@ -257,7 +261,7 @@ async def upload(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "filename": name, "characters": len(extracted), "is_image": bool(mime_type)}
+    return {"id": item.id, "filename": name, "characters": len(extracted), "is_image": bool(image_mime_type)}
 
 
 @app.post("/api/files/generate")
