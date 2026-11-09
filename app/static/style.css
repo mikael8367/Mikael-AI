@@ -6,3 +6,5 @@ input,textarea{width:100%;background:#08120d;color:var(--text);border:1px solid 
 @media(min-width:700px){.tab-page{padding:30px}.hero{padding:48px}.quick-grid{grid-template-columns:repeat(4,1fr)}.messages{height:calc(100dvh - 280px)}}
 
 .file-actions{display:flex;gap:6px;flex:none}.file-actions button{border:1px solid var(--line);background:transparent;border-radius:9px;padding:7px;font-size:12px}.setting-card input{margin:10px 0}.setting-card textarea{margin:0 0 10px}
+
+.file-item{align-items:center}.file-info{min-width:0;flex:1;overflow-wrap:anywhere}.file-thumb{width:58px;height:58px;object-fit:cover;border-radius:10px;border:1px solid var(--line);flex:none}.file-item .file-actions{flex-wrap:wrap;justify-content:flex-end}
