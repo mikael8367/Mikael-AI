@@ -3,7 +3,7 @@ from pathlib import Path
 from io import BytesIO
 
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -12,11 +12,11 @@ from pypdf import PdfReader
 from docx import Document
 
 from .db import Base, engine, get_db
-from .models import Conversation, Message, Memory, UploadedFile
+from .models import Conversation, Message, Memory, UploadedFile, Connector
 from .security import make_session, require_auth
-from .llm import answer, answer_with_image, generate_image
+from .llm import answer, answer_with_image, generate_image\nfrom .connectors import (encrypt_secret, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -41,6 +41,12 @@ class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     conversation_id: int | None = None
     model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini)$")
+
+
+class MCPConnectorBody(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    endpoint: str = Field(min_length=10, max_length=2000)
+    token: str = Field(default="", max_length=4096)
 
 
 class GenerateImageBody(BaseModel):
@@ -177,7 +183,7 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.add(Message(conversation_id=c.id, role="user", content=body.message))
     db.commit()
     try:
-        result = answer(context, model_id=body.model_id)
+        result = answer(context, model_id=body.model_id, external_tools=connector_tools(db), tool_executor=lambda name, args: execute_connector_tool(name, args, db))
     except HTTPException:
         raise
     except Exception as exc:
