@@ -320,6 +320,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
             return {"error": "GitHub não está conectado."}
         if not bool(getattr(connector, "enabled", True)):
             return {"error": "O conector GitHub está desativado. Ative-o em Configurações para usar suas ferramentas."}
+        if not _connector_tool_enabled(connector, name):
+            return {"error": "Esta ferramenta está desabilitada nas permissões do conector GitHub."}
         token = decrypt_secret(connector.secret)
         if name == "github_list_repositories":
             visibility = arguments.get("visibility", "all")
@@ -339,6 +341,45 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 return {"error": "O caminho não corresponde a um arquivo de texto simples."}
             raw = base64.b64decode(data["content"])
             return {"path": data.get("path"), "content": raw.decode("utf-8", errors="replace")[:24000]}
+        if name == "github_search_code":
+            query = arguments.get("query")
+            if not isinstance(query, str) or not query.strip() or len(query) > 300:
+                return {"error": "Informe uma consulta de código válida."}
+            data = _http_json("https://api.github.com/search/code?" + urllib.parse.urlencode({"q":query,"per_page":20}), token)
+            return [{"repository":(x.get("repository") or {}).get("full_name"),"path":x.get("path"),"url":x.get("html_url")} for x in (data.get("items") or [])[:20]]
+        if name == "github_list_branches":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            if not all(isinstance(x,str) and x.strip() and len(x)<100 for x in (owner,repo)):
+                return {"error":"Owner ou repositório inválido."}
+            data = _http_json("https://api.github.com/repos/%s/%s/branches?per_page=100" % (urllib.parse.quote(owner,safe=""),urllib.parse.quote(repo,safe="")),token)
+            return [{"name":x.get("name"),"sha":(x.get("commit") or {}).get("sha")} for x in data[:100]]
+        if name == "github_list_pull_requests":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            state = arguments.get("state","open")
+            if state not in {"open","closed","all"}: state="open"
+            if not all(isinstance(x,str) and x.strip() and len(x)<100 for x in (owner,repo)):
+                return {"error":"Owner ou repositório inválido."}
+            data = _http_json("https://api.github.com/repos/%s/%s/pulls?state=%s&per_page=30" % (urllib.parse.quote(owner,safe=""),urllib.parse.quote(repo,safe=""),state),token)
+            return [{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"head":(x.get("head") or {}).get("ref"),"base":(x.get("base") or {}).get("ref"),"url":x.get("html_url")} for x in data[:30]]
+        if name == "github_create_branch":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            source, new = arguments.get("source_branch"), arguments.get("new_branch")
+            if not all(isinstance(x,str) and x.strip() and len(x)<200 for x in (owner,repo,source,new)) or new == source:
+                return {"error":"Informe owner, repo e nomes de branches válidos e diferentes."}
+            base_url="https://api.github.com/repos/%s/%s/git/ref/heads/%s" % (urllib.parse.quote(owner,safe=""),urllib.parse.quote(repo,safe=""),urllib.parse.quote(source,safe="/"))
+            source_ref=_http_json(base_url,token)
+            sha=(source_ref.get("object") or {}).get("sha")
+            if not isinstance(sha,str) or len(sha)!=40:
+                return {"error":"Não foi possível obter o commit da branch de origem."}
+            result=_http_json("https://api.github.com/repos/%s/%s/git/refs" % (urllib.parse.quote(owner,safe=""),urllib.parse.quote(repo,safe="")),token,method="POST",payload={"ref":"refs/heads/"+new,"sha":sha})
+            return {"ok":True,"branch":(result.get("ref") or "").replace("refs/heads/",""),"sha":(result.get("object") or {}).get("sha")}
+        if name == "github_create_issue_comment":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            number, body = arguments.get("number"), arguments.get("body")
+            if not all(isinstance(x,str) and x.strip() and len(x)<100 for x in (owner,repo)) or not isinstance(number,int) or number<1 or not isinstance(body,str) or not body.strip() or len(body)>60000:
+                return {"error":"Parâmetros do comentário inválidos."}
+            result=_http_json("https://api.github.com/repos/%s/%s/issues/%s/comments" % (urllib.parse.quote(owner,safe=""),urllib.parse.quote(repo,safe=""),number),token,method="POST",payload={"body":body})
+            return {"ok":True,"url":result.get("html_url"),"id":result.get("id")}
         if name == "github_list_issues":
             owner, repo = arguments.get("owner"), arguments.get("repo")
             if not all(isinstance(x, str) and x and len(x) < 100 for x in (owner, repo)):
@@ -427,6 +468,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
             return {"error": "Conector MCP não encontrado."}
         if not bool(getattr(item, "enabled", True)):
             return {"error": "Este conector MCP está desativado. Ative-o em Configurações para usar suas ferramentas."}
+        if not _connector_tool_enabled(item, name):
+            return {"error": "Esta ferramenta está desabilitada nas permissões deste conector MCP."}
         token = decrypt_secret(item.secret) if item.secret else None
         # Resolve o nome original consultando novamente o servidor, sem confiar no modelo.
         listed = _mcp_call(item.endpoint, token, "tools/list")
@@ -436,6 +479,39 @@ def execute_connector_tool(name: str, arguments: dict, db):
             return {"error": "A ferramenta não existe mais no servidor MCP."}
         result = _mcp_call(item.endpoint, token, "tools/call", {"name": original, "arguments": arguments})
         return result
+    if name.startswith("workspace_"):
+        from .models import UploadedFile
+        if name == "workspace_list_files":
+            rows=db.query(UploadedFile).order_by(UploadedFile.id.desc()).limit(50).all()
+            return [{"file_id":x.id,"filename":x.filename,"characters":len(x.extracted_text or "")} for x in rows]
+        if name == "workspace_create_file":
+            filename=arguments.get("filename")
+            content=arguments.get("content")
+            if not isinstance(filename,str) or not filename.strip() or len(filename)>120 or "/" in filename or "\\" in filename or not isinstance(content,str):
+                return {"error":"Nome ou conteúdo do arquivo inválido."}
+            if len(content.encode("utf-8"))>800000:
+                return {"error":"O arquivo excede 800 KB."}
+            item=UploadedFile(filename=filename.strip(),extracted_text=content,file_data=content.encode("utf-8"),mime_type="text/plain")
+            db.add(item);db.commit();db.refresh(item)
+            return {"ok":True,"file_id":item.id,"filename":item.filename,"characters":len(content),"download":"/api/files/%s/download"%item.id}
+        if name == "workspace_read_file":
+            file_id=arguments.get("file_id")
+            if not isinstance(file_id,int) or file_id<1:return {"error":"file_id inválido."}
+            item=db.get(UploadedFile,file_id)
+            if not item:return {"error":"Arquivo não encontrado."}
+            return {"file_id":item.id,"filename":item.filename,"content":(item.extracted_text or "")[:30000]}
+        if name == "workspace_update_file":
+            file_id=arguments.get("file_id")
+            content=arguments.get("content")
+            if not isinstance(file_id,int) or file_id<1 or not isinstance(content,str):return {"error":"Parâmetros inválidos."}
+            if len(content.encode("utf-8"))>800000:return {"error":"O arquivo excede 800 KB."}
+            item=db.get(UploadedFile,file_id)
+            if not item:return {"error":"Arquivo não encontrado."}
+            item.extracted_text=content
+            item.file_data=content.encode("utf-8")
+            item.mime_type="text/plain"
+            db.commit()
+            return {"ok":True,"file_id":item.id,"filename":item.filename,"characters":len(content)}
     return {"error": "Ferramenta desconhecida."}
 
 
