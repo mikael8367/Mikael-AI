@@ -65,6 +65,7 @@ class LocalInferenceTests(unittest.TestCase):
             "LLM_PROVIDER": "local",
             "LLM_LOCAL_BASE_URL": "https://model.example/v1",
             "LLM_LOCAL_MODEL": "mikael-coder",
+            "LLM_LOCAL_API_KEY": "private-test-token",
         }
         with patch.dict(os.environ, env, clear=True), patch("app.llm.OpenAI", return_value=fake_client):
             result = llm.answer([{"role": "user", "content": "Explique uma função Python"}])
