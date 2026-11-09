@@ -17,7 +17,7 @@ from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
-APP_VERSION = "1.11.0"
+APP_VERSION = "1.12.1"
 
 Base.metadata.create_all(bind=engine)
 
@@ -208,13 +208,16 @@ def github_oauth_callback(request: Request, code: str = "", state: str = "", err
 
 @app.post("/api/connectors/mcp")
 def add_mcp_connector(body: MCPConnectorBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    name = body.name.strip()
+    if len(name) < 2:
+        raise HTTPException(422, "O nome do conector precisa ter pelo menos 2 caracteres.")
     endpoint = validate_mcp_endpoint(body.endpoint)
     token = body.token.strip() or None
     try:
         tools = mcp_test(endpoint, token)
     except Exception as exc:
         raise HTTPException(400, "Não foi possível conectar ao servidor MCP: " + str(exc)[:180])
-    item = Connector(provider="mcp", name=body.name.strip(), endpoint=endpoint, account="%s ferramenta(s)" % len(tools), secret=encrypt_secret(token) if token else "")
+    item = Connector(provider="mcp", name=name, endpoint=endpoint, account="%s ferramenta(s)" % len(tools), secret=encrypt_secret(token) if token else "")
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -240,6 +243,8 @@ def test_connector(connector_id: int, _: None = Depends(require_auth), db: Sessi
     item = db.get(Connector, connector_id)
     if not item:
         raise HTTPException(404, "Conector não encontrado.")
+    if not bool(item.enabled):
+        raise HTTPException(409, "Este conector está desabilitado. Habilite-o antes de testar.")
     if item.provider == "github":
         from .connectors import _http_json, decrypt_secret
         try:
