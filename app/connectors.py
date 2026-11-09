@@ -221,7 +221,7 @@ GITHUB_TOOL_SPECS = [
     {"name":"github_list_branches","label":"Listar branches","description":"Lista branches de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"}},"required":["owner","repo"],"additionalProperties":False}},
     {"name":"github_list_pull_requests","label":"Listar pull requests","description":"Lista pull requests de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"state":{"type":"string","enum":["open","closed","all"]}},"required":["owner","repo"],"additionalProperties":False}},
     {"name":"github_create_branch","label":"Criar branch","description":"Cria uma nova branch a partir de uma branch existente. Não apaga nem altera a branch de origem.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"source_branch":{"type":"string"},"new_branch":{"type":"string"}},"required":["owner","repo","source_branch","new_branch"],"additionalProperties":False}},
-    {"name":"github_write_file","label":"Criar ou modificar arquivos","description":"Cria ou atualiza um arquivo de texto em um repositório, gerando commit. Nunca use para apagar arquivos.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"content":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"}},"required":["owner","repo","path","content","message"],"additionalProperties":False}},
+    {"name":"github_write_file","label":"Criar ou modificar arquivos","description":"Cria um arquivo ou atualiza um arquivo pequeno. Antes de atualizar, leia o arquivo e informe o sha retornado como expected_sha. Para arquivo novo, omita expected_sha. Gera commit e nunca apaga arquivos.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"content":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"},"expected_sha":{"type":"string"}},"required":["owner","repo","path","content","message"],"additionalProperties":False}},
     {"name":"github_create_issue","label":"Criar issue","description":"Cria uma issue em um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"}},"required":["owner","repo","title"],"additionalProperties":False}},
     {"name":"github_create_issue_comment","label":"Comentar em issue ou PR","description":"Publica um comentário em uma issue ou pull request. Use somente quando o usuário pedir explicitamente.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"number":{"type":"integer"},"body":{"type":"string"}},"required":["owner","repo","number","body"],"additionalProperties":False}},
     {"name":"github_create_pull_request","label":"Criar pull request","description":"Cria um pull request entre branches existentes.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"title":{"type":"string"},"head":{"type":"string"},"base":{"type":"string"},"body":{"type":"string"}},"required":["owner","repo","title","head","base"],"additionalProperties":False}},
@@ -339,8 +339,10 @@ def execute_connector_tool(name: str, arguments: dict, db):
             data = _http_json(url + (("?" + query) if query else ""), token)
             if data.get("encoding") != "base64" or not data.get("content"):
                 return {"error": "O caminho não corresponde a um arquivo de texto simples."}
+            if int(data.get("size") or 0) > 10000:
+                return {"error": "Este arquivo excede 10.000 bytes e não pode ser editado com segurança por esta ferramenta."}
             raw = base64.b64decode(data["content"])
-            return {"path": data.get("path"), "content": raw.decode("utf-8", errors="replace")[:24000]}
+            return {"path": data.get("path"), "sha": data.get("sha"), "content": raw.decode("utf-8", errors="replace")}
         if name == "github_search_code":
             query = arguments.get("query")
             if not isinstance(query, str) or not query.strip() or len(query) > 300:
@@ -398,12 +400,23 @@ def execute_connector_tool(name: str, arguments: dict, db):
             branch = arguments.get("branch")
             query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
             base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
-            current = None
+            current_data = None
             try:
-                current = _http_json(base + (("?" + query) if query else ""), token).get("sha")
+                current_data = _http_json(base + (("?" + query) if query else ""), token)
             except RuntimeError as exc:
                 if "HTTP 404" not in str(exc):
                     raise
+            expected_sha = arguments.get("expected_sha")
+            if current_data:
+                if int(current_data.get("size") or 0) > 10000:
+                    return {"error":"O arquivo existente excede 10.000 bytes; a edição direta foi bloqueada para evitar sobrescrever conteúdo incompleto."}
+                if not isinstance(expected_sha,str) or expected_sha != current_data.get("sha"):
+                    return {"error":"Antes de modificar este arquivo, leia-o com github_read_file e envie o sha retornado em expected_sha."}
+                current = current_data.get("sha")
+            else:
+                if expected_sha:
+                    return {"error":"O arquivo não existe mais. Consulte novamente o caminho antes de criar ou atualizar."}
+                current = None
             payload = {"message": message[:200], "content": base64.b64encode(content.encode("utf-8")).decode("ascii")}
             if current:
                 payload["sha"] = current
