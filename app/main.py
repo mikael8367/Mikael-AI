@@ -15,9 +15,9 @@ from .db import Base, engine, get_db
 from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
-from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled)
+from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report)
 
-APP_VERSION = "1.12.1"
+APP_VERSION = "1.13.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -151,6 +151,41 @@ def list_models(_: None = Depends(require_auth)):
 def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).order_by(Connector.id.asc())).all()
     return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True, "enabled": bool(c.enabled), "avatar_url": c.avatar_url if c.provider == "github" else ""} for c in rows]
+
+
+@app.get("/api/connectors/github/permissions")
+def github_permissions(_: None = Depends(require_auth), db: Session = Depends(get_db)):
+    connector = db.scalars(select(Connector).where(Connector.provider == "github")).first()
+    if not connector:
+        raise HTTPException(404, "Nenhuma conta GitHub está conectada.")
+    try:
+        report = github_permission_report(decrypt_secret(connector.secret))
+    except Exception as exc:
+        logging.warning("Falha ao consultar permissões GitHub (%s)", type(exc).__name__)
+        raise HTTPException(502, str(exc)[:220])
+    report.update({
+        "connected": True,
+        "enabled": bool(connector.enabled),
+        "available_tools": [
+            {"id": "github_list_repositories", "label": "Listar repositórios"},
+            {"id": "github_read_file", "label": "Ler arquivos de repositórios"},
+            {"id": "github_list_issues", "label": "Listar issues abertas"},
+            {"id": "github_write_file", "label": "Criar ou atualizar arquivos (gera commit)"},
+            {"id": "github_create_issue", "label": "Criar issues"},
+            {"id": "github_create_pull_request", "label": "Criar pull requests entre branches existentes"},
+            {"id": "github_delete_file", "label": "Solicitar exclusão de arquivo (exige aprovação na Mikael AI)"},
+        ],
+        "not_exposed": [
+            {"label": "Criar ou excluir branches", "detail": "Não existe ferramenta correspondente na interface."},
+            {"label": "Fazer merge de pull requests ou fechar issues/PRs", "detail": "Não existe ferramenta correspondente na interface."},
+            {"label": "Administrar membros, colaboradores ou regras de proteção", "detail": "Não existe ferramenta correspondente na interface."},
+            {"label": "Gerenciar secrets, webhooks, releases ou configurações", "detail": "Não existe ferramenta correspondente na interface."},
+            {"label": "Executar GitHub Actions ou consultar logs de workflows", "detail": "O escopo workflow pode estar autorizado, mas a Mikael AI não oferece essas ferramentas."},
+            {"label": "Excluir repositórios inteiros", "detail": "Não existe ferramenta correspondente na interface; excluir um arquivo é uma operação separada e exige aprovação."},
+        ],
+        "scope_notice": "Os escopos OAuth representam a autorização concedida ao aplicativo. Eles não são uma lista de botões/ferramentas da Mikael AI. O escopo repo é amplo; a interface expõe somente as ferramentas listadas acima.",
+    })
+    return report
 
 
 @app.get("/api/connectors/github/start")
