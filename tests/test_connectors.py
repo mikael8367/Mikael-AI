@@ -7,7 +7,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled, github_permission_report, _connector_permissions, _connector_tool_enabled, GITHUB_TOOL_SPECS
-from app.models import PendingAction, Connector
+from app.models import PendingAction, Connector, UploadedFile
 
 
 class _ContextResponse:
@@ -91,6 +91,36 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertEqual(result["file_id"], 456)
         self.assertEqual(db.item.file_data, b"class Example {}")
         self.assertEqual(db.item.extracted_text, "class Example {}")
+
+    def test_workspace_update_requires_matching_content_hash(self):
+        import hashlib
+        item = SimpleNamespace(id=9, filename="Main.java", extracted_text="class Main {}", file_data=b"class Main {}", mime_type="text/plain")
+        class FakeDB:
+            def get(self, model, file_id):
+                self.asserted = (model, file_id)
+                return item
+            def commit(self):
+                pass
+        db = FakeDB()
+        digest = hashlib.sha256(item.extracted_text.encode("utf-8")).hexdigest()
+        result = execute_connector_tool("workspace_update_file", {
+            "file_id": 9, "content": "class Main { int x; }", "expected_sha256": digest
+        }, db)
+        self.assertTrue(result["ok"])
+        self.assertEqual(item.extracted_text, "class Main { int x; }")
+
+    def test_workspace_update_rejects_stale_content_hash(self):
+        item = SimpleNamespace(id=9, filename="Main.java", extracted_text="class Main {}", file_data=b"class Main {}", mime_type="text/plain")
+        class FakeDB:
+            def get(self, model, file_id):
+                return item
+            def commit(self):
+                raise AssertionError("Não deve salvar conteúdo com hash antigo")
+        result = execute_connector_tool("workspace_update_file", {
+            "file_id": 9, "content": "class Main { int x; }", "expected_sha256": "stale"
+        }, FakeDB())
+        self.assertIn("alterado desde a leitura", result["error"])
+        self.assertEqual(item.extracted_text, "class Main {}")
 
     def test_rejects_plain_http_mcp(self):
         with self.assertRaises(HTTPException):
