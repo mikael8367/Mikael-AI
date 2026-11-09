@@ -16,7 +16,7 @@ from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 
 Base.metadata.create_all(bind=engine)
 
