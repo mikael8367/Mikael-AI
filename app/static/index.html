@@ -58,6 +58,13 @@
         <p>Conecte suas contas e permita que a Mikael AI use ferramentas autorizadas. Tokens ficam no servidor, criptografados.</p>
         <button id="githubConnect" class="primary" type="button">Conectar conta GitHub</button>
         <small id="githubStatus" class="connector-note">O GitHub solicitará autorização em uma página oficial.</small>
+        <div class="github-permissions-card">
+          <div class="permissions-heading">
+            <div><b>Permissões do GitHub</b><small class="connector-note">Consulta os escopos OAuth informados pelo próprio GitHub e compara com as ferramentas desta interface.</small></div>
+            <button id="githubPermissionsRefresh" class="outline" type="button">Verificar</button>
+          </div>
+          <div id="githubPermissions" class="permissions-content" aria-live="polite">Conecte uma conta GitHub para consultar as permissões.</div>
+        </div>
         <div class="connector-divider"></div>
         <b>Adicionar servidor MCP remoto</b>
         <p>Informe o endereço HTTPS do servidor MCP e, se necessário, um token Bearer. Não use sua senha da conta.</p>
