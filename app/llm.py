@@ -77,7 +77,12 @@ def get_client():
             raise RuntimeError("LLM_LOCAL_BASE_URL deve usar HTTPS. HTTP só é permitido para testes em localhost.")
         if not parsed_url.netloc or parsed_url.username or parsed_url.password or parsed_url.fragment:
             raise RuntimeError("LLM_LOCAL_BASE_URL contém uma URL inválida ou credenciais embutidas.")
-        key = (os.getenv("LLM_LOCAL_API_KEY") or "").strip() or "local-no-auth"
+        key = (os.getenv("LLM_LOCAL_API_KEY") or "").strip()
+        if not key:
+            raise RuntimeError(
+                "Configure LLM_LOCAL_API_KEY com o token de acesso do servidor próprio. "
+                "Não exponha um endpoint público de inferência sem autenticação."
+            )
         timeout = 300
     else:
         key = (os.getenv("LLM_API_KEY") or "").strip()
