@@ -220,7 +220,7 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 return {"error": "Parâmetros owner, repo e path inválidos."}
             ref = arguments.get("ref")
             query = urllib.parse.urlencode({"ref": ref}) if isinstance(ref, str) and ref else ""
-            url = "https://api.github.com/repos/%s/%s/contents/%s" % tuple(urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
+            url = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
             data = _http_json(url + (("?" + query) if query else ""), token)
             if data.get("encoding") != "base64" or not data.get("content"):
                 return {"error": "O caminho não corresponde a um arquivo de texto simples."}
