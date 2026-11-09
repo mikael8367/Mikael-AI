@@ -117,8 +117,16 @@ def _append_web_citations(message):
     return content
 
 
-def answer(messages):
-    model = (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
+MODEL_PRESETS = {
+    "mikael": None,
+    "deepseek": "deepseek/deepseek-v4.1-flash",
+    "gpt4o_mini": "openai/gpt-4o-mini",
+}
+
+def answer(messages, model_id="mikael"):
+    if model_id not in MODEL_PRESETS:
+        raise ValueError("Modelo de IA inválido.")
+    model = MODEL_PRESETS[model_id] or (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
     effort = (os.getenv("LLM_REASONING_EFFORT") or "high").strip().lower()
     if effort not in {"low", "medium", "high"}:
         effort = "high"
