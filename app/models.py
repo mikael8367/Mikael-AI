@@ -39,6 +39,19 @@ class UploadedFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class PendingAction(Base):
+    __tablename__ = "pending_actions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tool_name: Mapped[str] = mapped_column(String(80))
+    arguments: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(180))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    expires_at: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class Connector(Base):
     __tablename__ = "connectors"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
