@@ -12,12 +12,13 @@ class LocalInferenceTests(unittest.TestCase):
             "LLM_PROVIDER": "local",
             "LLM_LOCAL_BASE_URL": "https://model.example/v1",
             "LLM_LOCAL_MODEL": "mikael-coder",
+            "LLM_LOCAL_API_KEY": "private-test-token",
         }
         with patch.dict(os.environ, env, clear=True), patch("app.llm.OpenAI") as client:
             llm.get_client()
         kwargs = client.call_args.kwargs
         self.assertEqual(kwargs["base_url"], "https://model.example/v1")
-        self.assertEqual(kwargs["api_key"], "local-no-auth")
+        self.assertEqual(kwargs["api_key"], "private-test-token")
         self.assertEqual(kwargs["timeout"], 300)
 
     def test_local_client_never_falls_back_to_openrouter_url_or_key(self):
@@ -28,6 +29,14 @@ class LocalInferenceTests(unittest.TestCase):
         }
         with patch.dict(os.environ, env, clear=True):
             with self.assertRaisesRegex(RuntimeError, "LLM_LOCAL_BASE_URL"):
+                llm.get_client()
+
+    def test_local_client_requires_server_authentication(self):
+        with patch.dict(os.environ, {
+            "LLM_PROVIDER": "local",
+            "LLM_LOCAL_BASE_URL": "https://model.example/v1",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "LLM_LOCAL_API_KEY"):
                 llm.get_client()
 
     def test_local_client_rejects_public_plain_http_endpoint(self):
