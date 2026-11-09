@@ -61,4 +61,5 @@ class Connector(Base):
     account: Mapped[str] = mapped_column(String(180), default="")
     secret: Mapped[str] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
+    avatar_url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
