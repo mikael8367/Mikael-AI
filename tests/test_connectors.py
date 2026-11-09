@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi import HTTPException
 
-from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled, github_permission_report
+from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled, github_permission_report, _connector_permissions, _connector_tool_enabled, GITHUB_TOOL_SPECS
 from app.models import PendingAction, Connector
 
 
@@ -57,6 +57,40 @@ class ConnectorSecurityTests(unittest.TestCase):
             report = github_permission_report("fake-token")
         self.assertIsNone(report["oauth_scopes"])
         self.assertEqual(report["scope_status"], "unavailable")
+
+    def test_empty_connector_permissions_preserve_legacy_all_tools_behavior(self):
+        connector = SimpleNamespace(tool_permissions="")
+        self.assertIsNone(_connector_permissions(connector))
+        self.assertTrue(_connector_tool_enabled(connector, "github_read_file"))
+
+    def test_explicit_empty_permissions_disable_every_connector_tool(self):
+        connector = SimpleNamespace(tool_permissions="[]")
+        self.assertEqual(_connector_permissions(connector), set())
+        self.assertFalse(_connector_tool_enabled(connector, "github_read_file"))
+
+    def test_expanded_github_catalog_contains_code_search_and_branch_tools(self):
+        names = {tool["name"] for tool in GITHUB_TOOL_SPECS}
+        self.assertIn("github_search_code", names)
+        self.assertIn("github_list_branches", names)
+        self.assertIn("github_create_branch", names)
+        self.assertIn("github_list_pull_requests", names)
+
+    def test_workspace_create_file_saves_text_artifact(self):
+        class FakeDB:
+            def add(self, item):
+                self.item = item
+            def commit(self):
+                pass
+            def refresh(self, item):
+                item.id = 456
+        db = FakeDB()
+        result = execute_connector_tool("workspace_create_file", {
+            "filename": "Example.java", "content": "class Example {}"
+        }, db)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["file_id"], 456)
+        self.assertEqual(db.item.file_data, b"class Example {}")
+        self.assertEqual(db.item.extracted_text, "class Example {}")
 
     def test_rejects_plain_http_mcp(self):
         with self.assertRaises(HTTPException):
