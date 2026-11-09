@@ -86,23 +86,56 @@ def _http_json(url: str, token: str | None = None, method: str = "GET", payload=
 def _mcp_call(endpoint: str, token: str | None, method: str, params=None):
     endpoint = validate_mcp_endpoint(endpoint)
     headers = {"MCP-Protocol-Version": "2025-03-26"}
-    init = _http_json(endpoint, token, "POST", {
+    # MCP Streamable HTTP sessions may require the session ID returned by initialize.
+    init = _mcp_post(endpoint, token, {
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "Mikael AI", "version": "1.8.0"}}
     }, headers)
-    # Stateless servers may omit a session ID; stateful servers return it in the response.
     session = init.get("_session_id") if isinstance(init, dict) else None
-    initialized_headers = dict(headers)
     if session:
-        initialized_headers["Mcp-Session-Id"] = session
-    _http_json(endpoint, token, "POST", {"jsonrpc": "2.0", "method": "notifications/initialized"}, initialized_headers)
-    result = _http_json(endpoint, token, "POST", {
+        headers["Mcp-Session-Id"] = session
+    _mcp_post(endpoint, token, {"jsonrpc": "2.0", "method": "notifications/initialized"}, headers)
+    result = _mcp_post(endpoint, token, {
         "jsonrpc": "2.0", "id": 2, "method": method, "params": params or {}
-    }, initialized_headers)
+    }, headers)
     if isinstance(result, dict) and result.get("error"):
         raise RuntimeError("O servidor MCP retornou um erro ao processar a solicitação.")
     return result.get("result", result) if isinstance(result, dict) else result
 
+
+def _mcp_post(endpoint, token, payload, headers=None):
+    import urllib.error
+    request_headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        "User-Agent": "Mikael-AI/1.8",
+        **(headers or {})
+    }
+    if token:
+        request_headers["Authorization"] = "Bearer " + token
+    request = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), headers=request_headers, method="POST")
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(request, timeout=18) as response:
+            raw = response.read(2 * 1024 * 1024 + 1)
+            if len(raw) > 2 * 1024 * 1024:
+                raise RuntimeError("Resposta MCP excedeu 2 MB.")
+            session_id = response.headers.get("Mcp-Session-Id")
+            content_type = response.headers.get("Content-Type", "")
+            text = raw.decode("utf-8", errors="replace")
+            if "text/event-stream" in content_type:
+                events = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
+                text = next((event for event in reversed(events) if event and event != "[DONE]"), "{}")
+            result = json.loads(text) if text else {}
+            if isinstance(result, dict) and session_id:
+                result["_session_id"] = session_id
+            return result
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError("O servidor MCP recusou a solicitação (HTTP %s)." % exc.code)
+    except urllib.error.URLError:
+        raise RuntimeError("Não foi possível alcançar o servidor MCP.")
+    except (TimeoutError, socket.timeout):
+        raise RuntimeError("O servidor MCP demorou demais para responder.")
 
 def _safe_schema(schema):
     if not isinstance(schema, dict):
