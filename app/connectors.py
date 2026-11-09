@@ -384,7 +384,9 @@ def execute_connector_tool(name: str, arguments: dict, db):
             owner, repo = arguments.get("owner"), arguments.get("repo")
             if not all(isinstance(x, str) and x and len(x) < 100 for x in (owner, repo)):
                 return {"error": "Owner ou repositório inválido."}
-            data = _http_json("https://api.github.com/repos/%s/%s/issues?state=open&per_page=30" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")), token)
+            state = arguments.get("state", "open")
+            if state not in {"open", "closed", "all"}: state = "open"
+            data = _http_json("https://api.github.com/repos/%s/%s/issues?state=%s&per_page=30" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), state), token)
             return [{"number": x.get("number"), "title": x.get("title"), "url": x.get("html_url"), "state": x.get("state")} for x in data if "pull_request" not in x]
         if name == "github_write_file":
             owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
