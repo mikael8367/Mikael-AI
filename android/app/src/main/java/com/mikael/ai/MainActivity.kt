@@ -62,6 +62,13 @@ class MainActivity : Activity() {
                 Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
                 Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
               } catch (_) {}
+              let lastFinishedTaskId = null;
+              const finishTaskOnce = (task) => {
+                const id = String(task?.id ?? 'unknown');
+                if (lastFinishedTaskId === id) return;
+                lastFinishedTaskId = id;
+                window.MikaelNative?.workFinished(task.status, id);
+              };
               const originalFetch = window.fetch.bind(window);
               window.fetch = async (...args) => {
                 const requestUrl = String(args[0]?.url || args[0] || '');
@@ -72,21 +79,21 @@ class MainActivity : Activity() {
                     else {
                       try {
                         const task = await response.clone().json();
-                        if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
-                        else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                        if (task.status === 'running') { lastFinishedTaskId = null; window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento'); }
+                        else if (['completed','cancelled','failed'].includes(task.status)) finishTaskOnce(task);
                       } catch (_) {}
                     }
                   } else if (/\/api\/work\/current$/.test(requestUrl) && response.ok) {
                     try {
                       const task = await response.clone().json();
-                      if (task && task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
-                      else if (task && ['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                      if (task && task.status === 'running') { lastFinishedTaskId = null; window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento'); }
+                      else if (task && ['completed','cancelled','failed'].includes(task.status)) finishTaskOnce(task);
                       else if (task && task.status === 'paused') window.MikaelNative?.workPaused();
                     } catch (_) {}
                   } else if (/\/api\/work\/\d+\/(pause|resume|cancel)$/.test(requestUrl) && response.ok) {
                     try {
                       const task = await response.clone().json();
-                      if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
+                      if (task.status === 'running') { lastFinishedTaskId = null; window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento'); }
                       else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
                       else if (task.status === 'paused') window.MikaelNative?.workPaused();
                     } catch (_) {}
@@ -113,7 +120,7 @@ class MainActivity : Activity() {
                 if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
             }
         }
-        @JavascriptInterface fun workFinished(status: String) {
+        @JavascriptInterface fun workFinished(status: String, taskId: String) {
             runOnUiThread {
                 stopService(Intent(this@MainActivity, WorkNotificationService::class.java))
                 if (status == "completed") WorkNotificationService.showFinished(this@MainActivity, "Mikael AI concluiu o trabalho")
