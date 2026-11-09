@@ -64,3 +64,17 @@ class Connector(Base):
     avatar_url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     tool_permissions: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class WorkTask(Base):
+    __tablename__ = "work_tasks"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(Integer, index=True)
+    goal: Mapped[str] = mapped_column(Text)
+    model_id: Mapped[str] = mapped_column(String(40), default="mikael")
+    status: Mapped[str] = mapped_column(String(20), default="running", index=True)
+    remaining_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    progress: Mapped[str] = mapped_column(Text, default="")
+    result: Mapped[str] = mapped_column(Text, default="")
+    cycle_started_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
