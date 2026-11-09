@@ -26,9 +26,12 @@
     </section>
     <section id="tab-chat" class="tab-page">
       <div class="section-head"><div><span class="eyebrow">MIKAEL AI</span><h2>Conversas</h2></div><button id="newChat" class="outline">+ Nova</button></div>
-      <div class="section-head"><h3>Histórico</h3></div>
+      <div class="section-head"><h3>Histórico</h3><small id="conversationCount" class="connector-note"></small></div>
+      <input id="conversationSearch" type="search" placeholder="Pesquisar conversas..." aria-label="Pesquisar conversas">
       <div id="conversationList" class="list"></div>
+      <small id="currentConversationLabel" class="connector-note">Nenhuma conversa selecionada</small>
       <div id="messages" class="messages"><div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div></div>
+      <div id="workStatus" class="work-status hidden" aria-live="polite"></div>
       <div class="model-picker"><label for="modelSelect">Modelo de IA</label><select id="modelSelect" aria-label="Selecionar modelo de inteligência artificial"><option value="mikael">Mikael AI</option><option value="deepseek">DeepSeek V4.1 Flash</option><option value="gpt4o_mini">GPT-4o mini</option></select></div>
       <div class="composer"><button id="attachBtn" class="attach-btn" type="button" aria-label="Anexar arquivo ou imagem" title="Enviar arquivo ou imagem">＋</button><button id="imageGenBtn" class="image-gen-btn" type="button" aria-label="Gerar imagem com IA" title="Gerar imagem com IA">✧</button><input id="chatFileInput" type="file" accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.jsx,.tsx,.java,.kt,.json,.yaml,.yml,.xml,.html,.css,.scss,.gradle,.properties,.toml,.log,.csv,.sql,.sh,.c,.cpp,.h,.cs,.go,.rs,.php,.rb,.jpg,.jpeg,.png,.webp,.gif,image/*" multiple hidden><textarea id="prompt" rows="2" placeholder="Pergunte sobre código, bugs ou projetos..."></textarea><button id="sendBtn" aria-label="Enviar">↑</button></div>
       <small class="hint">A IA pode cometer erros. Revise alterações antes de usar em produção.</small>
@@ -51,11 +54,12 @@
     </section>
     <section id="tab-settings" class="tab-page">
       <div class="section-head"><div><span class="eyebrow">PREFERÊNCIAS</span><h2>Configurações</h2></div></div>
+      <div class="setting-card"><b>Voz e atualizações</b><p>A Mikael AI pode mostrar e ler em voz alta as etapas enquanto trabalha. A leitura depende do suporte de voz do navegador.</p><label class="voice-toggle"><input id="speakProgress" type="checkbox"> Falar atualizações de trabalho em voz alta</label></div>
       <div class="setting-card"><b>Memória da Mikael AI</b><p>Salve informações úteis sobre seus projetos para reutilizar em conversas futuras.</p><textarea id="memoryText" rows="3" placeholder="Ex.: Meu projeto usa Java 8 e Forge 1.12.2..."></textarea><button id="saveMemory" class="primary">Salvar memória</button></div>
       <div id="memoryList" class="list"></div>
       <div class="setting-card connector-card">
         <b>Conectores e servidores MCP</b>
-        <p>Conecte suas contas e permita que a Mikael AI use ferramentas autorizadas. Tokens ficam no servidor, criptografados.</p>
+        <p>Conecte vários serviços. Cada conector pode ficar ativo ou pausado e você escolhe exatamente quais ferramentas a Mikael AI pode usar. Tokens ficam no servidor, criptografados.</p>
         <button id="githubConnect" class="primary" type="button">Conectar conta GitHub</button>
         <small id="githubStatus" class="connector-note">O GitHub solicitará autorização em uma página oficial.</small>
         <div class="github-permissions-card">
@@ -74,7 +78,7 @@
         <button id="addMcp" class="primary" type="button">Testar e adicionar MCP</button>
         <small class="connector-note">Por segurança, somente HTTPS público é aceito. O conector precisa implementar MCP Streamable HTTP.</small>
       </div>
-      <div class="section-head"><h3>Contas conectadas</h3></div>
+      <div class="section-head"><h3>Contas e ferramentas conectadas</h3></div>
       <div id="connectorList" class="list"></div>
       <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão <span id="aboutVersion">__APP_VERSION__</span><br>Backend próprio, banco persistente e seleção de modelos de IA.</p></div>
     </section>
