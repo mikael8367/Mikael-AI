@@ -1,4 +1,5 @@
 import os
+import json
 from urllib.parse import urlparse
 from openai import OpenAI
 
@@ -123,21 +124,48 @@ MODEL_PRESETS = {
     "gpt4o_mini": "openai/gpt-4o-mini",
 }
 
-def answer(messages, model_id="mikael"):
+def answer(messages, model_id="mikael", external_tools=None, tool_executor=None):
     if model_id not in MODEL_PRESETS:
         raise ValueError("Modelo de IA inválido.")
     model = MODEL_PRESETS[model_id] or (os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
     effort = (os.getenv("LLM_REASONING_EFFORT") or "high").strip().lower()
     if effort not in {"low", "medium", "high"}:
         effort = "high"
-    response = get_client().chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
-        tools=_web_search_tools(),
-        extra_body={"reasoning": {"effort": effort}},
-        temperature=0.25,
-    )
-    return _append_web_citations(response.choices[0].message)
+    conversation = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    tools = _web_search_tools() + (external_tools or [])
+    client = get_client()
+    for _ in range(5):
+        response = client.chat.completions.create(
+            model=model,
+            messages=conversation,
+            tools=tools or None,
+            extra_body={"reasoning": {"effort": effort}},
+            temperature=0.25,
+        )
+        message = response.choices[0].message
+        calls = getattr(message, "tool_calls", None) or []
+        if not calls:
+            return _append_web_citations(message)
+        # Preserve the assistant tool-call message exactly as returned by the provider.
+        conversation.append(message.model_dump(exclude_none=True))
+        for call in calls[:8]:
+            function = call.function
+            try:
+                arguments = json.loads(function.arguments or "{}")
+                if not isinstance(arguments, dict):
+                    raise ValueError("Argumentos inválidos.")
+                if not tool_executor:
+                    result = {"error": "Nenhum executor de conectores está disponível."}
+                else:
+                    result = tool_executor(function.name, arguments)
+            except Exception as exc:
+                result = {"error": str(exc)[:500]}
+            conversation.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str)[:16000],
+            })
+    raise RuntimeError("A IA atingiu o limite de chamadas de ferramentas nesta resposta.")
 
 
 def answer_with_image(prompt, image_data_url):
