@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, DateTime, ForeignKey, Integer
+from sqlalchemy import String, Text, DateTime, ForeignKey, Integer, LargeBinary
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -34,4 +34,6 @@ class UploadedFile(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     filename: Mapped[str] = mapped_column(String(255))
     extracted_text: Mapped[str] = mapped_column(Text)
+    file_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
