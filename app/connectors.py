@@ -281,6 +281,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
             if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, path)) or not isinstance(message, str) or not message.strip():
                 return {"error": "Parâmetros de exclusão inválidos."}
             branch = arguments.get("branch")
+            if branch is not None and (not isinstance(branch, str) or len(branch) > 200):
+                return {"error": "Nome da branch inválido."}
             base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
             query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
             current = _http_json(base + (("?" + query) if query else ""), token)
