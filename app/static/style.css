@@ -31,3 +31,6 @@ input,textarea{width:100%;background:#08120d;color:var(--text);border:1px solid 
 .generated-image-bubble{width:min(100%,520px);max-width:100%;display:flex;flex-direction:column;gap:10px}
 .generated-image-bubble img{display:block;width:100%;height:auto;max-height:65vh;object-fit:contain;border-radius:12px;background:#08120d}
 .generated-image-actions a{color:var(--green);font-size:13px;text-decoration:none;font-weight:700}
+
+/* Seletor de modelo no compositor da conversa */
+.model-picker{display:flex;align-items:center;gap:9px;margin:0 0 8px;padding:0 2px}.model-picker label{font-size:11px;color:var(--muted);white-space:nowrap}.model-picker select{max-width:245px;min-width:0;flex:1;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font:inherit;font-size:12px;outline:none}.model-picker select:focus{border-color:var(--green)}
