@@ -30,6 +30,14 @@ class LocalInferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "LLM_LOCAL_BASE_URL"):
                 llm.get_client()
 
+    def test_local_client_rejects_public_plain_http_endpoint(self):
+        with patch.dict(os.environ, {
+            "LLM_PROVIDER": "local",
+            "LLM_LOCAL_BASE_URL": "http://model.example/v1",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "deve usar HTTPS"):
+                llm.get_client()
+
     def test_local_mode_disables_openrouter_web_search(self):
         with patch.dict(os.environ, {
             "LLM_PROVIDER": "local",
