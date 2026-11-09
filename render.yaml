@@ -3,7 +3,7 @@ services:
     name: mikael-ai
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python -m compileall -q app tests && python -m unittest discover -s tests
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
