@@ -48,7 +48,7 @@ class LoginBody(BaseModel):
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     conversation_id: int | None = None
-    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini|gemini_flash|claude_sonnet|qwen_coder|gpt5_mini)$")
+    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini|gemini_flash|claude_sonnet|qwen38_max|glm53_prime|gpt6_luna|gpt6_sol)$")
 
 
 class MCPConnectorBody(BaseModel):
@@ -149,14 +149,15 @@ def get_conversation(
 def list_models(_: None = Depends(require_auth)):
     return [
         {"id": "mikael", "name": "Mikael AI", "description": "Perfil principal, usando o modelo padrão configurado no servidor."},
-        {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo geral com foco em raciocínio e programação."},
+        {"id": "deepseek", "name": "DeepSeek V4.1 Flash", "description": "Modelo rápido para programação e tarefas gerais."},
         {"id": "gpt4o_mini", "name": "GPT-4o mini", "description": "Modelo compacto para tarefas rápidas."},
-        {"id": "gemini_flash", "name": "Gemini 2.5 Flash", "description": "Modelo multimodal rápido da Google."},
-        {"id": "claude_sonnet", "name": "Claude Sonnet 4.5", "description": "Modelo avançado para análise e programação."},
-        {"id": "qwen_coder", "name": "Qwen3 Coder Plus", "description": "Modelo especializado em programação."},
-        {"id": "gpt5_mini", "name": "GPT-5 mini", "description": "Modelo compacto da OpenAI."},
+        {"id": "gemini_flash", "name": "Gemini Flash Latest", "description": "Alias que acompanha a versão mais recente da família Gemini Flash."},
+        {"id": "claude_sonnet", "name": "Claude Sonnet Latest", "description": "Alias que acompanha a versão mais recente da família Claude Sonnet."},
+        {"id": "qwen38_max", "name": "Qwen3.8 Max Prime", "description": "Modelo avançado da família Qwen."},
+        {"id": "glm53_prime", "name": "GLM 5.3 Prime", "description": "Modelo voltado a programação e fluxos com agentes."},
+        {"id": "gpt6_luna", "name": "GPT-6 Luna", "description": "Modelo rápido para chat, programação e tarefas gerais."},
+        {"id": "gpt6_sol", "name": "GPT-6 Sol", "description": "Modelo de maior capacidade para tarefas complexas e programação."},
     ]
-
 
 @app.get("/api/connectors")
 def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
