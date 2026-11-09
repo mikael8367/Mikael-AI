@@ -174,7 +174,8 @@ def connector_tools(db):
                 {"type": "function", "function": {"name": "github_list_issues", "description": "Lista issues abertas de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}}, "required": ["owner", "repo"], "additionalProperties": False}}},
                 {"type": "function", "function": {"name": "github_write_file", "description": "Cria ou atualiza um arquivo de texto em um repositório GitHub autorizado, gerando um commit. Nunca use para apagar arquivos. Informe uma mensagem de commit clara.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "content": {"type": "string"}, "message": {"type": "string"}, "branch": {"type": "string"}}, "required": ["owner", "repo", "path", "content", "message"], "additionalProperties": False}}},
                 {"type": "function", "function": {"name": "github_create_issue", "description": "Cria uma issue em um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_create_pull_request", "description": "Cria um pull request entre branches existentes de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "head": {"type": "string"}, "base": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title", "head", "base"], "additionalProperties": False}}}
+                {"type": "function", "function": {"name": "github_create_pull_request", "description": "Cria um pull request entre branches existentes de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "head": {"type": "string"}, "base": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title", "head", "base"], "additionalProperties": False}}},
+                {"type": "function", "function": {"name": "github_delete_file", "description": "Solicita a exclusão de um arquivo de um repositório GitHub. Esta ferramenta NÃO apaga imediatamente: cria uma solicitação pendente que só será executada depois que o usuário aprovar na janela de confirmação da Mikael AI. Nunca solicite exclusão de repositórios inteiros, branches, secrets ou configurações.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "message": {"type": "string"}, "branch": {"type": "string"}}, "required": ["owner", "repo", "path", "message"], "additionalProperties": False}}}
             ])
         elif connector.provider == "mcp":
             try:
@@ -273,6 +274,36 @@ def execute_connector_tool(name: str, arguments: dict, db):
             payload = {"title": title[:200], "head": head[:200], "base": base[:200], "body": str(arguments.get("body") or "")[:60000]}
             result = _http_json("https://api.github.com/repos/%s/%s/pulls" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe="")), token, method="POST", payload=payload)
             return {"ok": True, "number": result.get("number"), "url": result.get("html_url")}
+        if name == "github_delete_file":
+            from .models import PendingAction
+            owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
+            message = arguments.get("message")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, path)) or not isinstance(message, str) or not message.strip():
+                return {"error": "Parâmetros de exclusão inválidos."}
+            branch = arguments.get("branch")
+            base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
+            query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
+            current = _http_json(base + (("?" + query) if query else ""), token)
+            if not isinstance(current, dict) or current.get("type") != "file" or not isinstance(current.get("sha"), str):
+                return {"error": "O caminho informado não corresponde a um arquivo único que possa ser confirmado."}
+            safe_args = {"owner": owner, "repo": repo, "path": current.get("path") or path, "message": message[:180], "branch": branch if isinstance(branch, str) else "", "sha": current["sha"]}
+            pending = db.query(PendingAction).filter_by(status="pending").count()
+            if pending >= 10:
+                return {"error": "Há muitas exclusões aguardando aprovação. Aprove ou negue as solicitações existentes primeiro."}
+            import time
+            action = PendingAction(
+                conversation_id=arguments.get("_conversation_id"),
+                tool_name="github_delete_file",
+                arguments=json.dumps(safe_args, ensure_ascii=False),
+                title="Excluir arquivo do GitHub",
+                description="%s/%s · %s · branch %s" % (owner, repo, safe_args["path"], safe_args["branch"] or "padrão"),
+                status="pending",
+                expires_at=int(time.time()) + 900,
+            )
+            db.add(action)
+            db.commit()
+            db.refresh(action)
+            return {"approval_required": True, "action_id": action.id, "message": "Aguardando aprovação explícita do usuário. Não tente executar a exclusão por outro caminho."}
         return {"error": "Ferramenta GitHub desconhecida."}
     if name.startswith("mcp_"):
         parts = name.split("_", 2)
