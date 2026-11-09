@@ -43,7 +43,7 @@
       <div class="section-head"><div><span class="eyebrow">PREFERÊNCIAS</span><h2>Configurações</h2></div></div>
       <div class="setting-card"><b>Memória da Mikael AI</b><p>Salve informações úteis sobre seus projetos para reutilizar em conversas futuras.</p><textarea id="memoryText" rows="3" placeholder="Ex.: Meu projeto usa Java 8 e Forge 1.12.2..."></textarea><button id="saveMemory" class="primary">Salvar memória</button></div>
       <div id="memoryList" class="list"></div>
-      <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão 1.0.0<br>Backend próprio, banco persistente e modelo LLM configurável.</p></div>
+      <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão <span id="aboutVersion">__APP_VERSION__</span><br>Backend próprio, banco persistente e modelo LLM configurável.</p></div>
     </section>
   </main>
   <nav class="bottom-nav">
@@ -53,6 +53,7 @@
     <button class="nav-item" data-tab="files"><span>▤</span>Arquivos</button>
     <button class="nav-item" data-tab="settings"><span>⚙</span>Ajustes</button>
   </nav>
+  <div class="version-tag" aria-label="Versão da Mikael AI">v__APP_VERSION__</div>
 </div>
 <div id="toast" class="toast"></div>
 <script src="/static/app.js"></script>
