@@ -11,6 +11,18 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException
 
 
+def normalize_mcp_name(value: str) -> str:
+    name = value.strip() if isinstance(value, str) else ""
+    if len(name) < 2 or len(name) > 120:
+        raise HTTPException(422, "O nome do conector precisa ter entre 2 e 120 caracteres.")
+    return name
+
+
+def ensure_connector_enabled(connector) -> None:
+    if not bool(getattr(connector, "enabled", True)):
+        raise HTTPException(409, "Este conector está desabilitado. Habilite-o antes de testar.")
+
+
 def _cipher():
     import hashlib
     secret = (os.getenv("APP_SECRET") or "").encode()
