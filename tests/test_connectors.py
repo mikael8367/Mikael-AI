@@ -6,8 +6,17 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi import HTTPException
 
-from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled
+from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled, github_permission_report
 from app.models import PendingAction, Connector
+
+
+class _ContextResponse:
+    def __init__(self, response):
+        self.response = response
+    def __enter__(self):
+        return self.response
+    def __exit__(self, exc_type, exc, traceback):
+        return False
 
 
 class ConnectorSecurityTests(unittest.TestCase):
@@ -25,6 +34,29 @@ class ConnectorSecurityTests(unittest.TestCase):
         encrypted = encrypt_secret("private-token-value")
         self.assertNotEqual(encrypted, "private-token-value")
         self.assertEqual(decrypt_secret(encrypted), "private-token-value")
+
+    def test_github_permission_report_reads_exact_oauth_scopes(self):
+        response = SimpleNamespace(
+            headers={"X-OAuth-Scopes": "read:user, repo, workflow"},
+            read=lambda size: b'{"login":"mikael8367"}',
+        )
+        opener = SimpleNamespace(open=lambda request, timeout: _ContextResponse(response))
+        with patch("app.connectors.urllib.request.build_opener", return_value=opener):
+            report = github_permission_report("fake-token")
+        self.assertEqual(report["account"], "mikael8367")
+        self.assertEqual(report["oauth_scopes"], ["read:user", "repo", "workflow"])
+        self.assertEqual(report["scope_status"], "confirmed")
+
+    def test_github_permission_report_does_not_infer_missing_scope_header(self):
+        response = SimpleNamespace(
+            headers={},
+            read=lambda size: b'{"login":"mikael8367"}',
+        )
+        opener = SimpleNamespace(open=lambda request, timeout: _ContextResponse(response))
+        with patch("app.connectors.urllib.request.build_opener", return_value=opener):
+            report = github_permission_report("fake-token")
+        self.assertIsNone(report["oauth_scopes"])
+        self.assertEqual(report["scope_status"], "unavailable")
 
     def test_rejects_plain_http_mcp(self):
         with self.assertRaises(HTTPException):
