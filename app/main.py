@@ -14,7 +14,8 @@ from docx import Document
 from .db import Base, engine, get_db
 from .models import Conversation, Message, Memory, UploadedFile, Connector
 from .security import make_session, require_auth
-from .llm import answer, answer_with_image, generate_image\nfrom .connectors import (encrypt_secret, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
+from .llm import answer, answer_with_image, generate_image
+from .connectors import (encrypt_secret, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool)
 
 APP_VERSION = "1.8.0"
 
