@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07110d"><title>Mikael AI</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="login" class="login-wrap">
+  <div class="brand-mark">M</div><h1>Mikael AI</h1><p>Assistente inteligente de programação</p>
+  <input id="password" type="password" placeholder="Senha de acesso" autocomplete="current-password">
+  <button id="loginBtn">Entrar</button><small id="loginError"></small>
+</div>
+<div id="app" class="app hidden">
+  <header><div class="brand"><div class="brand-mark small">M</div><div><b>Mikael AI</b><small>Engenharia de software</small></div></div><button id="logoutBtn" class="ghost">Sair</button></header>
+  <main>
+    <section id="tab-home" class="tab-page active">
+      <div class="hero"><span class="eyebrow">ASSISTENTE DE DESENVOLVIMENTO</span><h1>Olá! Vamos construir<br><em>algo incrível.</em></h1><p>Analiso código, investigo bugs e ajudo a desenvolver seus projetos.</p><button class="primary" id="startChat">Nova conversa</button></div>
+      <div class="section-head"><h2>Atalhos</h2></div>
+      <div class="quick-grid">
+        <button data-prompt="Faça uma auditoria profunda deste código e procure bugs." class="quick">⌘<b>Auditar código</b><small>Encontrar bugs e riscos</small></button>
+        <button data-prompt="Explique a arquitetura deste projeto e suas dependências." class="quick">▤<b>Entender projeto</b><small>Arquitetura e dependências</small></button>
+        <button data-prompt="Crie um plano de implementação com etapas e testes." class="quick">✦<b>Planejar projeto</b><small>Etapas e validação</small></button>
+        <button data-prompt="Revise este código pensando em segurança e desempenho." class="quick">⌁<b>Revisar código</b><small>Segurança e desempenho</small></button>
+      </div>
+    </section>
+    <section id="tab-chat" class="tab-page">
+      <div class="section-head"><div><span class="eyebrow">MIKAEL AI</span><h2>Conversas</h2></div><button id="newChat" class="outline">+ Nova</button></div>
+      <div id="messages" class="messages"><div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div></div>
+      <div class="composer"><textarea id="prompt" rows="2" placeholder="Pergunte sobre código, bugs ou projetos..."></textarea><button id="sendBtn" aria-label="Enviar">↑</button></div>
+      <small class="hint">A IA pode cometer erros. Revise alterações antes de usar em produção.</small>
+    </section>
+    <section id="tab-projects" class="tab-page">
+      <div class="section-head"><div><span class="eyebrow">WORKSPACE</span><h2>Projetos</h2></div></div>
+      <div class="empty-card"><div class="empty-icon">⌘</div><h3>Seu espaço de projetos</h3><p>Use conversas para planejar e analisar seus repositórios. Integração direta com GitHub pode ser adicionada na próxima etapa.</p></div>
+    </section>
+    <section id="tab-files" class="tab-page">
+      <div class="section-head"><div><span class="eyebrow">DOCUMENTOS E CÓDIGO</span><h2>Arquivos</h2></div></div>
+      <label class="upload-card">＋<b>Enviar arquivo</b><small>PDF, DOCX, Java, Python, JS, JSON e mais · até 8 MB</small><input id="fileInput" type="file" hidden></label>
+      <div id="fileList" class="list"></div>
+    </section>
+    <section id="tab-settings" class="tab-page">
+      <div class="section-head"><div><span class="eyebrow">PREFERÊNCIAS</span><h2>Configurações</h2></div></div>
+      <div class="setting-card"><b>Memória da Mikael AI</b><p>Salve informações úteis sobre seus projetos para reutilizar em conversas futuras.</p><textarea id="memoryText" rows="3" placeholder="Ex.: Meu projeto usa Java 8 e Forge 1.12.2..."></textarea><button id="saveMemory" class="primary">Salvar memória</button></div>
+      <div id="memoryList" class="list"></div>
+      <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão 1.0.0<br>Backend próprio, banco persistente e modelo LLM configurável.</p></div>
+    </section>
+  </main>
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="home"><span>⌂</span>Início</button>
+    <button class="nav-item" data-tab="chat"><span>◌</span>Conversas</button>
+    <button class="nav-item" data-tab="projects"><span>⌘</span>Projetos</button>
+    <button class="nav-item" data-tab="files"><span>▤</span>Arquivos</button>
+    <button class="nav-item" data-tab="settings"><span>⚙</span>Ajustes</button>
+  </nav>
+</div>
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body></html>
