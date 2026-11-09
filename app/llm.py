@@ -125,10 +125,12 @@ MODEL_PRESETS = {
     "mikael": None,
     "deepseek": "deepseek/deepseek-v4.1-flash",
     "gpt4o_mini": "openai/gpt-4o-mini",
-    "gemini_flash": "google/gemini-2.5-flash",
-    "claude_sonnet": "anthropic/claude-sonnet-4.5",
-    "qwen_coder": "qwen/qwen3-coder-plus",
-    "gpt5_mini": "openai/gpt-5-mini",
+    "gemini_flash": "~google/gemini-flash-latest",
+    "claude_sonnet": "~anthropic/claude-sonnet-latest",
+    "qwen38_max": "qwen/qwen3.8-max-prime",
+    "glm53_prime": "z-ai/glm-5.3-prime",
+    "gpt6_luna": "openai/gpt-6-luna",
+    "gpt6_sol": "openai/gpt-6-sol",
 }
 
 def answer(messages, model_id="mikael", external_tools=None, tool_executor=None, progress_callback=None):
