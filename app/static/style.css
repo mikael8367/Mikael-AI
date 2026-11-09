@@ -1,4 +1,3 @@
-[object Object]
 /* Janela de confirmação obrigatória para ações destrutivas */
 .approval-backdrop{position:fixed;inset:0;z-index:100;background:#000b;backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px;animation:approvalFade .18s ease}
 .approval-backdrop.hidden{display:none!important}
