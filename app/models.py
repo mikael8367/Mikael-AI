@@ -60,4 +60,5 @@ class Connector(Base):
     endpoint: Mapped[str] = mapped_column(Text, default="")
     account: Mapped[str] = mapped_column(String(180), default="")
     secret: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
