@@ -8,3 +8,11 @@ input,textarea{width:100%;background:#08120d;color:var(--text);border:1px solid 
 .file-actions{display:flex;gap:6px;flex:none}.file-actions button{border:1px solid var(--line);background:transparent;border-radius:9px;padding:7px;font-size:12px}.setting-card input{margin:10px 0}.setting-card textarea{margin:0 0 10px}
 
 .file-item{align-items:center}.file-info{min-width:0;flex:1;overflow-wrap:anywhere}.file-thumb{width:58px;height:58px;object-fit:cover;border-radius:10px;border:1px solid var(--line);flex:none}.file-item .file-actions{flex-wrap:wrap;justify-content:flex-end}
+
+/* Correções de navegação e usabilidade do histórico no celular */
+#conversationList{max-height:156px;overflow-y:auto;overscroll-behavior:contain;padding:2px}
+.conversation-item{width:100%;min-height:44px;flex:none;text-align:left;justify-content:flex-start;overflow-wrap:anywhere}
+.conversation-item.selected{border-color:var(--green);background:#123321;color:var(--green)}
+.conversation-item:focus-visible,.nav-item:focus-visible,button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+#prompt:disabled{opacity:.65}
+@media(max-width:380px){.tab-page{padding:18px 12px}.bottom-nav{padding-left:1px;padding-right:1px}.nav-item{min-width:0;flex:1;padding-left:2px;padding-right:2px;font-size:9px}.nav-item span{font-size:19px}.file-item{flex-wrap:wrap}.file-item .file-actions{width:100%;justify-content:flex-start}}
