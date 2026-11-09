@@ -308,7 +308,7 @@ def connector_tools(db):
         {"type":"function","function":{"name":"workspace_list_files","description":"Lista arquivos enviados ou criados na área Arquivos da Mikael AI.","parameters":{"type":"object","properties":{},"additionalProperties":False}}},
         {"type":"function","function":{"name":"workspace_create_file","description":"Cria um arquivo de texto na área Arquivos da Mikael AI para baixar. Informe filename e content.","parameters":{"type":"object","properties":{"filename":{"type":"string"},"content":{"type":"string"}},"required":["filename","content"],"additionalProperties":False}}},
         {"type":"function","function":{"name":"workspace_read_file","description":"Lê o conteúdo textual de um arquivo salvo na área Arquivos. Informe file_id.","parameters":{"type":"object","properties":{"file_id":{"type":"integer"}},"required":["file_id"],"additionalProperties":False}}},
-        {"type":"function","function":{"name":"workspace_update_file","description":"Modifica o conteúdo de um arquivo de texto salvo na área Arquivos. Informe file_id e o conteúdo completo atualizado. Não apaga arquivos.","parameters":{"type":"object","properties":{"file_id":{"type":"integer"},"content":{"type":"string"}},"required":["file_id","content"],"additionalProperties":False}}},
+        {"type":"function","function":{"name":"workspace_update_file","description":"Modifica um arquivo textual da área Arquivos. Primeiro leia o arquivo e depois informe file_id, content completo e expected_sha256 retornado pela leitura; isso evita sobrescrever uma versão mais recente.","parameters":{"type":"object","properties":{"file_id":{"type":"integer"},"content":{"type":"string"},"expected_sha256":{"type":"string"}},"required":["file_id","content","expected_sha256"],"additionalProperties":False}}},
     ])
     return tools[:80]
 
@@ -485,7 +485,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
         from .models import UploadedFile
         if name == "workspace_list_files":
             rows=db.query(UploadedFile).order_by(UploadedFile.id.desc()).limit(50).all()
-            return [{"file_id":x.id,"filename":x.filename,"characters":len(x.extracted_text or "")} for x in rows]
+            import hashlib
+            return [{"file_id":x.id,"filename":x.filename,"characters":len(x.extracted_text or ""),"sha256":hashlib.sha256((x.extracted_text or "").encode("utf-8")).hexdigest()} for x in rows]
         if name == "workspace_create_file":
             filename=arguments.get("filename")
             content=arguments.get("content")
@@ -501,19 +502,33 @@ def execute_connector_tool(name: str, arguments: dict, db):
             if not isinstance(file_id,int) or file_id<1:return {"error":"file_id inválido."}
             item=db.get(UploadedFile,file_id)
             if not item:return {"error":"Arquivo não encontrado."}
-            return {"file_id":item.id,"filename":item.filename,"content":(item.extracted_text or "")[:30000]}
+            import hashlib
+            return {"file_id":item.id,"filename":item.filename,"content":(item.extracted_text or "")[:30000],"sha256":hashlib.sha256((item.extracted_text or "").encode("utf-8")).hexdigest()}
         if name == "workspace_update_file":
+            import hashlib
             file_id=arguments.get("file_id")
             content=arguments.get("content")
-            if not isinstance(file_id,int) or file_id<1 or not isinstance(content,str):return {"error":"Parâmetros inválidos."}
-            if len(content.encode("utf-8"))>800000:return {"error":"O arquivo excede 800 KB."}
+            expected=arguments.get("expected_sha256")
+            if not isinstance(file_id,int) or file_id<1 or not isinstance(content,str) or not isinstance(expected,str):
+                return {"error":"Parâmetros inválidos. Leia o arquivo e informe expected_sha256."}
+            if len(content.encode("utf-8"))>800000:
+                return {"error":"O arquivo excede 800 KB."}
             item=db.get(UploadedFile,file_id)
-            if not item:return {"error":"Arquivo não encontrado."}
+            if not item:
+                return {"error":"Arquivo não encontrado."}
+            allowed_extensions={"txt","md","py","js","ts","jsx","tsx","java","kt","json","yaml","yml","xml","html","css","scss","gradle","properties","toml","log","csv","sql","sh","c","cpp","h","cs","go","rs","php","rb"}
+            extension=item.filename.rsplit(".",1)[-1].lower() if "." in item.filename else ""
+            if extension not in allowed_extensions:
+                return {"error":"Este tipo de arquivo não é editável pela ferramenta de texto."}
+            current_hash=hashlib.sha256((item.extracted_text or "").encode("utf-8")).hexdigest()
+            if current_hash != expected:
+                return {"error":"O arquivo foi alterado desde a leitura. Leia novamente antes de modificar."}
             item.extracted_text=content
             item.file_data=content.encode("utf-8")
             item.mime_type="text/plain"
             db.commit()
             return {"ok":True,"file_id":item.id,"filename":item.filename,"characters":len(content)}
+
     return {"error": "Ferramenta desconhecida."}
 
 
