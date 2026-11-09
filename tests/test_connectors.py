@@ -3,6 +3,7 @@ import unittest
 from fastapi import HTTPException
 
 from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema
+from app.models import PendingAction
 
 
 class ConnectorSecurityTests(unittest.TestCase):
@@ -28,6 +29,14 @@ class ConnectorSecurityTests(unittest.TestCase):
     def test_rejects_local_mcp_host(self):
         with self.assertRaises(HTTPException):
             validate_mcp_endpoint("https://localhost/mcp")
+
+    def test_pending_action_model_has_expiration_and_single_use_status(self):
+        self.assertEqual(PendingAction.__tablename__, "pending_actions")
+        columns = PendingAction.__table__.columns
+        self.assertIn("arguments", columns)
+        self.assertIn("status", columns)
+        self.assertIn("expires_at", columns)
+        self.assertIn("conversation_id", columns)
 
     def test_schema_is_limited_to_supported_fields(self):
         schema = _safe_schema({
