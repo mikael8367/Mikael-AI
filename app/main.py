@@ -14,9 +14,9 @@ from docx import Document
 from .db import Base, engine, get_db
 from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
-from .llm import answer, answer_with_image
+from .llm import answer, answer_with_image, generate_image
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -40,6 +40,10 @@ class LoginBody(BaseModel):
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     conversation_id: int | None = None
+
+
+class GenerateImageBody(BaseModel):
+    prompt: str = Field(min_length=5, max_length=4000)
 
 
 class MemoryBody(BaseModel):
@@ -363,3 +367,49 @@ def analyze_file(file_id: int, _: None = Depends(require_auth), db: Session = De
         logging.error("Falha no provedor de IA (%s): %s", type(exc).__name__, detail[:1200])
         raise HTTPException(502, "Falha ao consultar o provedor de IA. Consulte os logs do Render para identificar a causa.")
     return {"analysis": result}
+
+
+@app.post("/api/images/generate")
+def create_generated_image(
+    body: GenerateImageBody, _: None = Depends(require_auth), db: Session = Depends(get_db)
+):
+    try:
+        image_data_url, message = generate_image(body.prompt.strip())
+        match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)", image_data_url)
+        if not match:
+            raise RuntimeError("A imagem retornada não está em PNG, JPEG ou WEBP válido.")
+        mime_type, encoded = match.groups()
+        import base64
+        raw = base64.b64decode(encoded, validate=True)
+        if not raw or len(raw) > 12 * 1024 * 1024:
+            raise HTTPException(413, "A imagem gerada excedeu o limite de 12 MB.")
+        signatures = {
+            "image/png": raw.startswith(bytes([137, 80, 78, 71, 13, 10, 26, 10])),
+            "image/jpeg": raw.startswith(bytes([255, 216, 255])),
+            "image/webp": raw.startswith(b"RIFF") and raw[8:12] == b"WEBP",
+        }
+        if not signatures.get(mime_type, False):
+            raise RuntimeError("A assinatura do arquivo não corresponde ao formato informado.")
+        ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[mime_type]
+        item = UploadedFile(
+            filename="mikael-ai-gerada" + ext,
+            extracted_text="Imagem gerada pela Mikael AI. Prompt: " + body.prompt.strip(),
+            file_data=raw,
+            mime_type=mime_type,
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return {
+            "file_id": item.id,
+            "filename": item.filename,
+            "image_data_url": image_data_url,
+            "message": message if isinstance(message, str) else "",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        detail = str(exc)
+        detail = re.sub(r"(?i)(sk-or-v1-|sk-[A-Za-z0-9_-]{8,})[A-Za-z0-9_-]*", "[CHAVE_OCULTA]", detail)
+        logging.error("Falha ao gerar imagem (%s): %s", type(exc).__name__, detail[:1200])
+        raise HTTPException(502, "Não foi possível gerar a imagem. Confira o modelo de imagem e os créditos do OpenRouter.")
