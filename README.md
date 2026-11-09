@@ -29,7 +29,7 @@ A versão segue o padrão `MAJOR.MINOR.PATCH`:
 - **MINOR** (ex.: `1.1.0`): novos recursos mantendo compatibilidade.
 - **MAJOR** (ex.: `2.0.0`): mudanças grandes que alteram significativamente o funcionamento ou quebram compatibilidade.
 
-A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py` (atualmente 1.14.1). Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
+A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py` (atualmente 1.16.0 na branch de motor próprio). Ao publicar uma atualização, altere esse valor e mantenha a versão exibida na interface e no health check sincronizada.
 
 ## Limites desta versão
 - A IA não treina os pesos do modelo com conversas. O sistema guarda memórias e histórico para recuperar contexto.
@@ -94,6 +94,23 @@ A Mikael AI pode pesquisar na web quando a pergunta pedir informações atuais, 
 
 ## Modelo de programação e raciocínio
 O modelo padrão é `deepseek/deepseek-v4.1-flash`, com `LLM_REASONING_EFFORT=high`. O modelo e o nível de raciocínio podem ser alterados pelas variáveis `LLM_MODEL` e `LLM_REASONING_EFFORT` (`low`, `medium` ou `high`). O uso do provedor pode gerar custos conforme os preços e créditos da conta OpenRouter.
+
+## Motor próprio (sem cobrança por token de API externa)
+
+A partir da versão 1.16.0, o backend pode usar um servidor de inferência próprio compatível com a API OpenAI. Nesse modo, o chat não chama a OpenRouter, não usa a chave `LLM_API_KEY` e não faz fallback automático para modelos pagos.
+
+Para ativar:
+1. Hospede um modelo de pesos abertos em um servidor de inferência compatível com `/v1/chat/completions` (por exemplo, llama.cpp server).
+2. Configure `LLM_PROVIDER=local`.
+3. Configure `LLM_LOCAL_BASE_URL` com a URL HTTPS do servidor, incluindo `/v1`.
+4. Configure `LLM_LOCAL_MODEL` com o nome exato publicado pelo endpoint `/v1/models`.
+5. Se o servidor exigir autenticação, configure `LLM_LOCAL_API_KEY`.
+
+O modo local mostra somente o perfil Mikael AI. Os perfis externos DeepSeek e GPT-4o mini ficam ocultos e bloqueados para evitar custos acidentais. A busca web e a geração de imagens via OpenRouter são desativadas nesse modo. A análise de imagens só funciona se houver um modelo de visão local configurado em `LLM_LOCAL_VISION_MODEL`.
+
+**Importante:** o Render Free tem 512 MB de RAM e 0,1 CPU e não é adequado para hospedar o modelo de linguagem. Ele pode continuar hospedando a interface/API, enquanto a inferência precisa rodar em outra máquina/serviço sob seu controle, com memória suficiente. Um modelo pequeno também pode ser menos preciso e mais lento. O modo local elimina cobrança por token de uma API externa, mas não elimina custos de hardware, energia, hospedagem, tráfego ou limites do servidor.
+
+Modelo inicial sugerido para testes: Qwen2.5-Coder-0.5B-Instruct-GGUF. O repositório oficial lista aproximadamente 429 MB para Q4_0 e 491 MB para Q4_K_M. O arquivo do modelo não representa todo o consumo de RAM: o servidor, o contexto e a geração também precisam de memória. Esse modelo é um ponto de partida pequeno, não uma IA treinada do zero nem um modelo de alta capacidade. A etapa de treinamento/fine-tuning será separada e só começa depois de validar a inferência.
 
 ## Provedor de IA
 O projeto usa o SDK OpenAI com `base_url` configurável. Para OpenRouter, gere uma chave na sua conta e configure `LLM_API_KEY`. A disponibilidade e o preço dos modelos mudam; confira o identificador exato no painel do provedor. Não coloque a chave no frontend nem no GitHub.
