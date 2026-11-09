@@ -5,7 +5,7 @@ Branch: `feature/self-hosted-ai-engine`
 
 ## Objetivo
 
-Permitir que o aplicativo Android execute conversas de texto com um modelo GGUF diretamente no aparelho, usando llama.cpp compilado como biblioteca nativa, e oferecer em Configurações um limite de memória configurável. O site e o serviço Render existentes devem permanecer inalterados.
+Transformar o aplicativo Android em um app nativo e exclusivamente offline: executar conversas de texto com um modelo GGUF diretamente no aparelho, usando llama.cpp compilado como biblioteca nativa, com limite de memória configurável. O app não deve carregar o site nem depender do Render, OpenRouter ou de qualquer serviço de IA remoto.
 
 ## Estado atual observado
 
@@ -41,7 +41,7 @@ Permitir que o aplicativo Android execute conversas de texto com um modelo GGUF 
 - Primeira entrega local: conversa de texto, streaming de tokens, interrupção de geração, histórico local e troca/descarga de modelo. Upload/análise de arquivos e imagens, visão, ferramentas e pesquisa web ficam explicitamente fora da primeira fatia até serem integrados com segurança.
 - Começar com um GGUF pequeno e quantizado (classe 0.5B/1B, Q4), mas não fixar URL ou licença sem validar a fonte oficial, checksum, licença e compatibilidade do arquivo.
 - RAM será configurável em MiB, mas o valor máximo real será limitado pela memória disponível e pelo orçamento seguro calculado no aparelho. Nunca reservar toda a RAM física.
-- Configurações e histórico local ficam no armazenamento privado do app. O usuário pode apagar os modelos baixados e o histórico local pelas configurações.
+- Configurações e histórico ficam no armazenamento privado do app. O usuário pode apagar os modelos baixados e o histórico pelas configurações. A conexão com a internet só pode ser usada para baixar modelos e atualizações explicitamente solicitadas; nunca para enviar prompts ou respostas.
 
 ## Segurança, privacidade e riscos
 
@@ -56,13 +56,13 @@ Permitir que o aplicativo Android execute conversas de texto com um modelo GGUF 
 
 - Treinar pesos de um modelo do zero.
 - Garantir funcionamento de modelos grandes no Galaxy A12.
-- Inferência local de visão, geração de imagens, pesquisa web e conectores MCP/GitHub.
+- Inferência local de visão, geração de imagens, pesquisa web e conectores MCP/GitHub.\n- Qualquer modo Cloud ou dependência do Render/OpenRouter.
 - Alterar ou publicar o site, modificar o serviço Render, criar serviços pagos ou gerar APK assinado de loja.
 
 ## Plano de validação
 
 - Testes unitários para orçamento de memória, seleção de modelo, validação de arquivo/checksum e estados do runtime.
 - Testes Android para inicialização JNI, geração, cancelamento, descarregamento, troca de modo e recuperação após erro.
-- Verificar que o modo local não chama `/api/chat/stream` e que o modo Cloud continua chamando o endpoint existente.
+- Verificar que o app não contém WebView, chamadas de chat remotas, OpenRouter ou dependência do Render; prompts e respostas permanecem no aparelho.
 - Build debug em CI com NDK/CMake e teste em aparelho Android ARM64 real; registrar explicitamente limitações se não houver aparelho disponível.
 - Revisão final de segurança, concorrência, ciclo de vida Android, vazamentos de memória, falhas de download e regressões Cloud.
