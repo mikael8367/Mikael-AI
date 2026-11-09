@@ -7,7 +7,7 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Histórico persistente de conversas.
 - Memórias manuais persistidas no banco e recuperadas por correspondência de palavras.
 - Upload e extração de texto de código, PDF e DOCX.
-- Análise de arquivos pelo modelo (sem executar os arquivos).
+- Análise de arquivos pelo modelo (sem executar os arquivos).\n- Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
 - Health check em `/health`, incluindo a versão atual.
@@ -33,7 +33,7 @@ A versão atual fica centralizada em `APP_VERSION` no arquivo `app/main.py`. Ao 
 4. Em Environment, preencha `APP_PASSWORD` com uma senha forte e `LLM_API_KEY` com a chave do provedor.
 5. Confira `LLM_BASE_URL` e `LLM_MODEL`, faça o deploy e abra a URL `onrender.com` no navegador do celular.
 
-## Provedor de IA
+## Geração de imagens\nA geração usa a mesma `LLM_API_KEY` do OpenRouter e o modelo definido em `LLM_IMAGE_MODEL` (padrão: `google/gemini-2.5-flash-image`). A geração de imagens pode consumir créditos e não deve ser considerada gratuita. O usuário descreve a imagem no campo da conversa e toca no botão ✧. A imagem é salva em Arquivos.\n\n## Provedor de IA
 O projeto usa o SDK OpenAI com `base_url` configurável. Para OpenRouter, gere uma chave na sua conta e configure `LLM_API_KEY`. A disponibilidade e o preço dos modelos mudam; confira o identificador exato no painel do provedor. Não coloque a chave no frontend nem no GitHub.
 
 ## Desenvolvimento
