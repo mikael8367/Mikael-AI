@@ -54,7 +54,9 @@ async function loadModels(){try{const models=await api('/api/models');const sele
 $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael','deepseek','gpt4o_mini'].includes(value)){selectedModel='mikael';$('modelSelect').value='mikael';return}selectedModel=value;try{localStorage.setItem('mikael_selected_model',value)}catch{}toast('Modelo selecionado: '+$('modelSelect').selectedOptions[0].textContent)};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
-$('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};\n$('addMcp').onclick=addMcpConnector;\n$('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
+$('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};
+$('addMcp').onclick=addMcpConnector;
+$('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 async function generateChatImage(){
   const input=$('prompt');
