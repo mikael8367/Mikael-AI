@@ -127,6 +127,40 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertIn("alterado desde a leitura", result["error"])
         self.assertEqual(item.extracted_text, "class Main {}")
 
+    def test_multiple_connectors_contribute_tools_in_one_chat(self):
+        github = SimpleNamespace(provider="github", enabled=True, tool_permissions='["github_read_file"]')
+        mcp_a = SimpleNamespace(id=21, provider="mcp", enabled=True, name="Docs", tool_permissions="")
+        mcp_b = SimpleNamespace(id=22, provider="mcp", enabled=True, name="Search", tool_permissions="")
+        class FakeQuery:
+            def all(self):
+                return [github, mcp_a, mcp_b]
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        catalogs = [
+            [{"id":"mcp_21_aaa","original":"search_docs","label":"search_docs","description":"Search docs","parameters":{"type":"object","properties":{}}}],
+            [{"id":"mcp_22_bbb","original":"list_results","label":"list_results","description":"List results","parameters":{"type":"object","properties":{}}}],
+        ]
+        with patch("app.connectors._mcp_read_catalog", side_effect=catalogs):
+            names = {x["function"]["name"] for x in connector_tools(FakeDB())}
+        self.assertIn("github_read_file", names)
+        self.assertIn("mcp_21_aaa", names)
+        self.assertIn("mcp_22_bbb", names)
+        self.assertIn("workspace_create_file", names)
+
+    def test_github_executor_blocks_disabled_tool_before_using_token(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="[]", secret="not-decrypted")
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        result = execute_connector_tool("github_read_file", {}, FakeDB())
+        self.assertIn("desabilitada", result["error"])
+
     def test_rejects_plain_http_mcp(self):
         with self.assertRaises(HTTPException):
             validate_mcp_endpoint("http://example.com/mcp")
