@@ -200,7 +200,10 @@ def github_oauth_callback(request: Request, code: str = "", state: str = "", err
 def add_mcp_connector(body: MCPConnectorBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
     endpoint = validate_mcp_endpoint(body.endpoint)
     token = body.token.strip() or None
-    tools = mcp_test(endpoint, token)
+    try:
+        tools = mcp_test(endpoint, token)
+    except Exception as exc:
+        raise HTTPException(400, "Não foi possível conectar ao servidor MCP: " + str(exc)[:180])
     item = Connector(provider="mcp", name=body.name.strip(), endpoint=endpoint, account="%s ferramenta(s)" % len(tools), secret=encrypt_secret(token) if token else "")
     db.add(item)
     db.commit()
@@ -215,9 +218,15 @@ def test_connector(connector_id: int, _: None = Depends(require_auth), db: Sessi
         raise HTTPException(404, "Conector não encontrado.")
     if item.provider == "github":
         from .connectors import _http_json, decrypt_secret
-        account = _http_json("https://api.github.com/user", decrypt_secret(item.secret))
-        return {"ok": True, "account": account.get("login", item.account)}
-    tools = mcp_test(item.endpoint, decrypt_secret(item.secret) if item.secret else None)
+        try:
+            account = _http_json("https://api.github.com/user", decrypt_secret(item.secret))
+            return {"ok": True, "account": account.get("login", item.account)}
+        except Exception:
+            raise HTTPException(502, "Não foi possível validar a conexão GitHub. Talvez a autorização tenha sido revogada.")
+    try:
+        tools = mcp_test(item.endpoint, decrypt_secret(item.secret) if item.secret else None)
+    except Exception as exc:
+        raise HTTPException(502, "Falha ao testar o servidor MCP: " + str(exc)[:180])
     item.account = "%s ferramenta(s)" % len(tools)
     db.commit()
     return {"ok": True, "account": item.account, "tools": tools}
