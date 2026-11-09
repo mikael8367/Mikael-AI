@@ -53,6 +53,22 @@
       <div class="section-head"><div><span class="eyebrow">PREFERÊNCIAS</span><h2>Configurações</h2></div></div>
       <div class="setting-card"><b>Memória da Mikael AI</b><p>Salve informações úteis sobre seus projetos para reutilizar em conversas futuras.</p><textarea id="memoryText" rows="3" placeholder="Ex.: Meu projeto usa Java 8 e Forge 1.12.2..."></textarea><button id="saveMemory" class="primary">Salvar memória</button></div>
       <div id="memoryList" class="list"></div>
+      <div class="setting-card connector-card">
+        <b>Conectores e servidores MCP</b>
+        <p>Conecte suas contas e permita que a Mikael AI use ferramentas autorizadas. Tokens ficam no servidor, criptografados.</p>
+        <button id="githubConnect" class="primary" type="button">Conectar conta GitHub</button>
+        <small id="githubStatus" class="connector-note">O GitHub solicitará autorização em uma página oficial.</small>
+        <div class="connector-divider"></div>
+        <b>Adicionar servidor MCP remoto</b>
+        <p>Informe o endereço HTTPS do servidor MCP e, se necessário, um token Bearer. Não use sua senha da conta.</p>
+        <input id="mcpName" type="text" maxlength="120" placeholder="Nome do conector (ex.: Meu servidor)">
+        <input id="mcpEndpoint" type="url" maxlength="2000" placeholder="https://servidor.exemplo.com/mcp" autocomplete="url">
+        <input id="mcpToken" type="password" maxlength="4096" placeholder="Token Bearer (opcional)" autocomplete="off">
+        <button id="addMcp" class="primary" type="button">Testar e adicionar MCP</button>
+        <small class="connector-note">Por segurança, somente HTTPS público é aceito. O conector precisa implementar MCP Streamable HTTP.</small>
+      </div>
+      <div class="section-head"><h3>Contas conectadas</h3></div>
+      <div id="connectorList" class="list"></div>
       <div class="setting-card"><b>Sobre</b><p>Mikael AI · versão <span id="aboutVersion">__APP_VERSION__</span><br>Backend próprio, banco persistente e seleção de modelos de IA.</p></div>
     </section>
   </main>
