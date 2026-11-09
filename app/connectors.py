@@ -2,6 +2,7 @@ import base64
 import ipaddress
 import json
 import os
+import time
 import socket
 import urllib.error
 import urllib.parse
@@ -295,7 +296,6 @@ def execute_connector_tool(name: str, arguments: dict, db):
             ).count()
             if pending >= 10:
                 return {"error": "Há muitas exclusões aguardando aprovação. Aprove ou negue as solicitações existentes primeiro."}
-            import time
             action = PendingAction(
                 conversation_id=arguments.get("_conversation_id"),
                 tool_name="github_delete_file",
