@@ -123,7 +123,7 @@ def conversations(_: None = Depends(require_auth), db: Session = Depends(get_db)
     rows = db.scalars(
         select(Conversation).order_by(Conversation.created_at.desc()).limit(100)
     ).all()
-    return [{"id": c.id, "title": c.title} for c in rows]
+    return [{"id": c.id, "title": c.title, "created_at": c.created_at.isoformat() if c.created_at else ""} for c in rows]
 
 
 @app.get("/api/conversations/{conversation_id}")
@@ -214,21 +214,13 @@ def github_permissions(_: None = Depends(require_auth), db: Session = Depends(ge
     report.update({
         "connected": True,
         "enabled": bool(connector.enabled),
-        "available_tools": [
-            {"id": "github_list_repositories", "label": "Listar repositórios"},
-            {"id": "github_read_file", "label": "Ler arquivos de repositórios"},
-            {"id": "github_list_issues", "label": "Listar issues abertas"},
-            {"id": "github_write_file", "label": "Criar ou atualizar arquivos (gera commit)"},
-            {"id": "github_create_issue", "label": "Criar issues"},
-            {"id": "github_create_pull_request", "label": "Criar pull requests entre branches existentes"},
-            {"id": "github_delete_file", "label": "Solicitar exclusão de arquivo (exige aprovação na Mikael AI)"},
-        ],
+        "available_tools": connector_tool_catalog(connector),
         "not_exposed": [
-            {"label": "Criar ou excluir branches", "detail": "Não existe ferramenta correspondente na interface."},
+            {"label": "Excluir branches", "detail": "Não existe ferramenta correspondente na interface; criar branches está disponível."},
             {"label": "Fazer merge de pull requests ou fechar issues/PRs", "detail": "Não existe ferramenta correspondente na interface."},
             {"label": "Administrar membros, colaboradores ou regras de proteção", "detail": "Não existe ferramenta correspondente na interface."},
             {"label": "Gerenciar secrets, webhooks, releases ou configurações", "detail": "Não existe ferramenta correspondente na interface."},
-            {"label": "Executar GitHub Actions ou consultar logs de workflows", "detail": "O escopo workflow pode estar autorizado, mas a Mikael AI não oferece essas ferramentas."},
+            {"label": "Executar GitHub Actions ou consultar logs de workflows", "detail": "Ainda não há ferramenta para executar workflows ou consultar seus logs."},
             {"label": "Excluir repositórios inteiros", "detail": "Não existe ferramenta correspondente na interface; excluir um arquivo é uma operação separada e exige aprovação."},
         ],
         "scope_notice": "Os escopos OAuth representam a autorização concedida ao aplicativo. Eles não são uma lista de botões/ferramentas da Mikael AI. O escopo repo é amplo; a interface expõe somente as ferramentas listadas acima.",
