@@ -11,13 +11,13 @@ from sqlalchemy import select, inspect, text
 from pypdf import PdfReader
 from docx import Document
 
-from .db import Base, engine, get_db
+from .db import Base, engine, get_db, SessionLocal
 from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
-from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report)
+from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
 
-APP_VERSION = "1.13.0"
+APP_VERSION = "1.14.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -34,6 +34,8 @@ with engine.begin() as connection:
         connection.execute(text("ALTER TABLE connectors ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
     if "avatar_url" not in connector_columns:
         connection.execute(text("ALTER TABLE connectors ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"))
+    if "tool_permissions" not in connector_columns:
+        connection.execute(text("ALTER TABLE connectors ADD COLUMN tool_permissions TEXT NOT NULL DEFAULT ''"))
 
 app = FastAPI(title="Mikael AI", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -150,7 +152,53 @@ def list_models(_: None = Depends(require_auth)):
 @app.get("/api/connectors")
 def list_connectors(_: None = Depends(require_auth), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).order_by(Connector.id.asc())).all()
-    return [{"id": c.id, "provider": c.provider, "name": c.name, "account": c.account, "endpoint": c.endpoint if c.provider == "mcp" else "", "connected": True, "enabled": bool(c.enabled), "avatar_url": c.avatar_url if c.provider == "github" else ""} for c in rows]
+    return [{
+        "id": c.id, "provider": c.provider, "name": c.name, "account": c.account,
+        "endpoint": c.endpoint if c.provider == "mcp" else "",
+        "connected": True, "enabled": bool(c.enabled),
+        "avatar_url": c.avatar_url if c.provider == "github" else "",
+        "permissions_configured": bool((c.tool_permissions or "").strip()),
+    } for c in rows]
+
+
+@app.get("/api/connectors/{connector_id}/tools")
+def get_connector_tools(connector_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(Connector, connector_id)
+    if not item:
+        raise HTTPException(404, "Conector não encontrado.")
+    catalog = connector_tool_catalog(item)
+    raw = (item.tool_permissions or "").strip()
+    if raw:
+        try:
+            enabled_ids = json.loads(raw)
+            if not isinstance(enabled_ids, list):
+                enabled_ids = []
+        except Exception:
+            enabled_ids = []
+    else:
+        enabled_ids = [tool["id"] for tool in catalog]
+    return {"id": item.id, "enabled": bool(item.enabled), "tools": [
+        {**tool, "enabled": tool["id"] in enabled_ids} for tool in catalog
+    ]}
+
+
+class ConnectorToolsBody(BaseModel):
+    tool_ids: list[str] = Field(default_factory=list, max_length=80)
+
+
+@app.patch("/api/connectors/{connector_id}/tools")
+def update_connector_tools(connector_id: int, body: ConnectorToolsBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(Connector, connector_id)
+    if not item:
+        raise HTTPException(404, "Conector não encontrado.")
+    catalog = connector_tool_catalog(item)
+    available = {tool["id"] for tool in catalog}
+    requested = set(body.tool_ids)
+    if len(requested) != len(body.tool_ids) or not requested.issubset(available):
+        raise HTTPException(422, "A lista contém ferramentas duplicadas ou não disponíveis neste conector.")
+    item.tool_permissions = json.dumps(sorted(requested), ensure_ascii=False)
+    db.commit()
+    return {"ok": True, "id": item.id, "enabled_tools": sorted(requested)}
 
 
 @app.get("/api/connectors/github/permissions")
