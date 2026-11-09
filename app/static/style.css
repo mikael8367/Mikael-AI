@@ -16,3 +16,9 @@ input,textarea{width:100%;background:#08120d;color:var(--text);border:1px solid 
 .conversation-item:focus-visible,.nav-item:focus-visible,button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 #prompt:disabled{opacity:.65}
 @media(max-width:380px){.tab-page{padding:18px 12px}.bottom-nav{padding-left:1px;padding-right:1px}.nav-item{min-width:0;flex:1;padding-left:2px;padding-right:2px;font-size:9px}.nav-item span{font-size:19px}.file-item{flex-wrap:wrap}.file-item .file-actions{width:100%;justify-content:flex-start}}
+
+
+/* Anexo rápido no compositor da conversa */
+.composer .attach-btn{height:43px;width:43px;flex:none;border:1px solid var(--line);border-radius:12px;background:#14251c;color:var(--green);font-size:27px;line-height:1;display:grid;place-items:center;transition:background .2s,transform .2s}
+.composer .attach-btn:active{transform:scale(.94);background:#1d3a29}
+.composer .attach-btn:disabled{opacity:.5;cursor:not-allowed}
