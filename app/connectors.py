@@ -204,3 +204,37 @@ def execute_connector_tool(name: str, arguments: dict, db):
         result = _mcp_call(item.endpoint, token, "tools/call", {"name": arguments.pop("__tool_name", parts[2]), "arguments": arguments})
         return result
     return {"error": "Ferramenta desconhecida."}
+
+
+def github_exchange_code(code: str, redirect_uri: str):
+    client_id = (os.getenv("GITHUB_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("GITHUB_CLIENT_SECRET") or "").strip()
+    if not client_id or not client_secret:
+        raise RuntimeError("Configure GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET no Render.")
+    payload = urllib.parse.urlencode({
+        "client_id": client_id, "client_secret": client_secret,
+        "code": code, "redirect_uri": redirect_uri
+    }).encode()
+    request = urllib.request.Request(
+        "https://github.com/login/oauth/access_token", data=payload,
+        headers={"Accept": "application/json", "User-Agent": "Mikael-AI/1.8"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=18) as response:
+            data = json.loads(response.read(65536).decode("utf-8"))
+    except Exception:
+        raise RuntimeError("Não foi possível concluir a autorização do GitHub.")
+    token = data.get("access_token")
+    if not isinstance(token, str) or not token:
+        raise RuntimeError("O GitHub não retornou um token válido.")
+    account = _http_json("https://api.github.com/user", token)
+    return token, account
+
+
+def mcp_test(endpoint: str, token: str | None):
+    result = _mcp_call(endpoint, token, "tools/list")
+    tools = result.get("tools") if isinstance(result, dict) else None
+    if not isinstance(tools, list):
+        raise RuntimeError("O servidor respondeu, mas não retornou uma lista MCP de ferramentas.")
+    return [{"name": str(x.get("name", ""))[:100], "description": str(x.get("description", ""))[:240]} for x in tools[:50] if isinstance(x, dict) and x.get("name")]
