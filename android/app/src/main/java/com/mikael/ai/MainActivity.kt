@@ -94,7 +94,7 @@ class MainActivity : Activity() {
                     try {
                       const task = await response.clone().json();
                       if (task.status === 'running') { lastFinishedTaskId = null; window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento'); }
-                      else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                      else if (['completed','cancelled','failed'].includes(task.status)) finishTaskOnce(task);
                       else if (task.status === 'paused') window.MikaelNative?.workPaused();
                     } catch (_) {}
                   }
