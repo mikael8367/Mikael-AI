@@ -80,6 +80,42 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertIn("github_create_branch", names)
         self.assertIn("github_list_pull_requests", names)
 
+    def test_github_update_requires_sha_from_prior_read(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        with patch("app.connectors._http_json", return_value={"sha":"current-sha","size":20}) as request:
+            result = execute_connector_tool("github_write_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"README.md",
+                "content":"replacement","message":"Update README"
+            }, FakeDB())
+        self.assertIn("github_read_file", result["error"])
+        self.assertEqual(request.call_count, 1)
+
+    def test_github_update_rejects_large_existing_file(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        with patch("app.connectors._http_json", return_value={"sha":"current-sha","size":20000}) as request:
+            result = execute_connector_tool("github_write_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"large.py",
+                "content":"replacement","message":"Update large file","expected_sha":"current-sha"
+            }, FakeDB())
+        self.assertIn("excede 10.000 bytes", result["error"])
+        self.assertEqual(request.call_count, 1)
+
     def test_workspace_create_file_saves_text_artifact(self):
         class FakeDB:
             def add(self, item):
