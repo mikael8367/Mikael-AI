@@ -213,50 +213,104 @@ def _safe_schema(schema):
     return result
 
 
+GITHUB_TOOL_SPECS = [
+    {"name":"github_list_repositories","label":"Listar repositórios","description":"Lista repositórios acessíveis pela conta GitHub conectada.","parameters":{"type":"object","properties":{"visibility":{"type":"string","enum":["all","public","private"]}},"additionalProperties":False}},
+    {"name":"github_read_file","label":"Ler arquivos","description":"Lê um arquivo de texto de um repositório GitHub. Informe owner, repo e path.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"ref":{"type":"string"}},"required":["owner","repo","path"],"additionalProperties":False}},
+    {"name":"github_list_issues","label":"Listar issues","description":"Lista issues abertas de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"state":{"type":"string","enum":["open","closed","all"]}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_search_code","label":"Pesquisar código","description":"Pesquisa arquivos e trechos de código nos repositórios que a conta pode acessar. Informe uma consulta GitHub Code Search.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"],"additionalProperties":False}},
+    {"name":"github_list_branches","label":"Listar branches","description":"Lista branches de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_list_pull_requests","label":"Listar pull requests","description":"Lista pull requests de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"state":{"type":"string","enum":["open","closed","all"]}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_create_branch","label":"Criar branch","description":"Cria uma nova branch a partir de uma branch existente. Não apaga nem altera a branch de origem.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"source_branch":{"type":"string"},"new_branch":{"type":"string"}},"required":["owner","repo","source_branch","new_branch"],"additionalProperties":False}},
+    {"name":"github_write_file","label":"Criar ou modificar arquivos","description":"Cria ou atualiza um arquivo de texto em um repositório, gerando commit. Nunca use para apagar arquivos.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"content":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"}},"required":["owner","repo","path","content","message"],"additionalProperties":False}},
+    {"name":"github_create_issue","label":"Criar issue","description":"Cria uma issue em um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"}},"required":["owner","repo","title"],"additionalProperties":False}},
+    {"name":"github_create_issue_comment","label":"Comentar em issue ou PR","description":"Publica um comentário em uma issue ou pull request. Use somente quando o usuário pedir explicitamente.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"number":{"type":"integer"},"body":{"type":"string"}},"required":["owner","repo","number","body"],"additionalProperties":False}},
+    {"name":"github_create_pull_request","label":"Criar pull request","description":"Cria um pull request entre branches existentes.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"title":{"type":"string"},"head":{"type":"string"},"base":{"type":"string"},"body":{"type":"string"}},"required":["owner","repo","title","head","base"],"additionalProperties":False}},
+    {"name":"github_delete_file","label":"Solicitar exclusão de arquivo","description":"Cria uma solicitação pendente. O arquivo só será apagado depois da aprovação explícita na interface.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"}},"required":["owner","repo","path","message"],"additionalProperties":False}},
+]
+
+def _connector_permissions(connector):
+    raw = getattr(connector, "tool_permissions", "") or ""
+    if not raw.strip():
+        return None
+    try:
+        value = json.loads(raw)
+        return set(x for x in value if isinstance(x, str)) if isinstance(value, list) else None
+    except Exception:
+        return set()
+
+def _connector_tool_enabled(connector, tool_id):
+    allowed = _connector_permissions(connector)
+    return allowed is None or tool_id in allowed
+
+def _mcp_read_catalog(connector):
+    token = decrypt_secret(connector.secret) if connector.secret else None
+    result = _mcp_call(connector.endpoint, token, "tools/list")
+    catalog = []
+    for tool in (result.get("tools") or [])[:50]:
+        original = tool.get("name")
+        if not isinstance(original, str) or not original:
+            continue
+        lowered = original.lower()
+        if not lowered.startswith(("get_", "list_", "read_", "search_", "find_", "fetch_", "query_", "describe_", "inspect_", "show_", "status_", "whoami")):
+            continue
+        description = str(tool.get("description") or "").lower()
+        if any(word in description for word in ("delete", "remove", "write", "update", "create", "execute", "run command", "send ", "deploy", "purchase", "modify", "transfer", "payment")):
+            continue
+        import hashlib
+        safe = hashlib.sha256(original.encode()).hexdigest()[:12]
+        catalog.append({
+            "id": "mcp_%s_%s" % (connector.id, safe),
+            "original": original,
+            "label": original[:100],
+            "description": str(tool.get("description") or original)[:700],
+            "parameters": _safe_schema(tool.get("inputSchema")),
+        })
+    return catalog
+
+def connector_tool_catalog(connector):
+    if connector.provider == "github":
+        return [{"id": item["name"], "label": item["label"], "description": item["description"]} for item in GITHUB_TOOL_SPECS]
+    if connector.provider == "mcp":
+        try:
+            return [{"id": item["id"], "label": item["label"], "description": item["description"]} for item in _mcp_read_catalog(connector)]
+        except Exception:
+            return []
+    return []
+
 def connector_tools(db):
     from .models import Connector
     tools = []
-    rows = db.query(Connector).all()
-    for connector in rows:
+    for connector in db.query(Connector).all():
         if not bool(getattr(connector, "enabled", True)):
             continue
         if connector.provider == "github":
-            tools.extend([
-                {"type": "function", "function": {"name": "github_list_repositories", "description": "Lista repositórios da conta GitHub conectada. Use quando o usuário pedir para ver seus repositórios.", "parameters": {"type": "object", "properties": {"visibility": {"type": "string", "enum": ["all", "public", "private"]}}, "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_read_file", "description": "Lê um arquivo de um repositório GitHub autorizado. Informe owner, repo e path.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "ref": {"type": "string"}}, "required": ["owner", "repo", "path"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_list_issues", "description": "Lista issues abertas de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}}, "required": ["owner", "repo"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_write_file", "description": "Cria ou atualiza um arquivo de texto em um repositório GitHub autorizado, gerando um commit. Nunca use para apagar arquivos. Informe uma mensagem de commit clara.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "content": {"type": "string"}, "message": {"type": "string"}, "branch": {"type": "string"}}, "required": ["owner", "repo", "path", "content", "message"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_create_issue", "description": "Cria uma issue em um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_create_pull_request", "description": "Cria um pull request entre branches existentes de um repositório GitHub autorizado.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "head": {"type": "string"}, "base": {"type": "string"}, "body": {"type": "string"}}, "required": ["owner", "repo", "title", "head", "base"], "additionalProperties": False}}},
-                {"type": "function", "function": {"name": "github_delete_file", "description": "Solicita a exclusão de um arquivo de um repositório GitHub. Esta ferramenta NÃO apaga imediatamente: cria uma solicitação pendente que só será executada depois que o usuário aprovar na janela de confirmação da Mikael AI. Nunca solicite exclusão de repositórios inteiros, branches, secrets ou configurações.", "parameters": {"type": "object", "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}, "path": {"type": "string"}, "message": {"type": "string"}, "branch": {"type": "string"}}, "required": ["owner", "repo", "path", "message"], "additionalProperties": False}}}
-            ])
+            for spec in GITHUB_TOOL_SPECS:
+                if not _connector_tool_enabled(connector, spec["name"]):
+                    continue
+                tools.append({"type":"function","function":{
+                    "name":spec["name"],"description":spec["description"],
+                    "parameters":spec["parameters"]
+                }})
         elif connector.provider == "mcp":
             try:
-                token = decrypt_secret(connector.secret) if connector.secret else None
-                result = _mcp_call(connector.endpoint, token, "tools/list")
-                for tool in (result.get("tools") or [])[:25]:
-                    original = tool.get("name")
-                    if not isinstance(original, str) or not original:
+                for spec in _mcp_read_catalog(connector):
+                    if not _connector_tool_enabled(connector, spec["id"]):
                         continue
-                    # Only expose tools that appear read-only; side-effecting MCP actions stay blocked.
-                    lowered = original.lower()
-                    if not lowered.startswith(("get_", "list_", "read_", "search_", "find_", "fetch_", "query_", "describe_", "inspect_", "show_", "status_", "whoami")):
-                        continue
-                    description = str(tool.get("description") or "").lower()
-                    if any(word in description for word in ("delete", "remove", "write", "update", "create", "execute", "run command", "send ", "deploy", "purchase", "modify")):
-                        continue
-                    import hashlib
-                    safe = hashlib.sha256(original.encode()).hexdigest()[:12]
-                    name = "mcp_%s_%s" % (connector.id, safe)
-                    tools.append({"type": "function", "function": {
-                        "name": name,
-                        "description": ("Servidor MCP %s: " % connector.name) + str(tool.get("description") or original)[:700],
-                        "parameters": _safe_schema(tool.get("inputSchema"))
+                    tools.append({"type":"function","function":{
+                        "name":spec["id"],
+                        "description":"Conector %s: %s" % (connector.name, spec["description"]),
+                        "parameters":spec["parameters"]
                     }})
             except Exception:
                 continue
-    return tools[:60]
-
+    # Ferramentas locais da área de arquivos da Mikael AI.
+    tools.extend([
+        {"type":"function","function":{"name":"workspace_list_files","description":"Lista arquivos enviados ou criados na área Arquivos da Mikael AI.","parameters":{"type":"object","properties":{},"additionalProperties":False}}},
+        {"type":"function","function":{"name":"workspace_create_file","description":"Cria um arquivo de texto na área Arquivos da Mikael AI para baixar. Informe filename e content.","parameters":{"type":"object","properties":{"filename":{"type":"string"},"content":{"type":"string"}},"required":["filename","content"],"additionalProperties":False}}},
+        {"type":"function","function":{"name":"workspace_read_file","description":"Lê o conteúdo textual de um arquivo salvo na área Arquivos. Informe file_id.","parameters":{"type":"object","properties":{"file_id":{"type":"integer"}},"required":["file_id"],"additionalProperties":False}}},
+        {"type":"function","function":{"name":"workspace_update_file","description":"Modifica o conteúdo de um arquivo de texto salvo na área Arquivos. Informe file_id e o conteúdo completo atualizado. Não apaga arquivos.","parameters":{"type":"object","properties":{"file_id":{"type":"integer"},"content":{"type":"string"}},"required":["file_id","content"],"additionalProperties":False}}},
+    ])
+    return tools[:80]
 
 def execute_connector_tool(name: str, arguments: dict, db):
     from .models import Connector
