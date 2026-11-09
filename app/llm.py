@@ -112,7 +112,7 @@ def _append_web_citations(message):
         links.append(f"- [{safe_title}]({url})")
     content = message.content or "Não consegui gerar uma resposta."
     if links:
-        content += "\\n\\n**Fontes consultadas:**\\n" + "\\n".join(links)
+        content += "\n\n**Fontes consultadas:**\n" + "\n".join(links)
     return content
 
 
