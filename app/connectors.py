@@ -23,6 +23,44 @@ def ensure_connector_enabled(connector) -> None:
         raise HTTPException(409, "Este conector está desabilitado. Habilite-o antes de testar.")
 
 
+def github_permission_report(token: str) -> dict:
+    """Consulta /user e lê X-OAuth-Scopes; nunca infere escopos ausentes."""
+    request = urllib.request.Request(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "Mikael-AI/1.13",
+        },
+        method="GET",
+    )
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(request, timeout=18) as response:
+            raw = response.read(65537)
+            if len(raw) > 65536:
+                raise RuntimeError("Resposta do GitHub excedeu o limite esperado.")
+            account_data = json.loads(raw.decode("utf-8")) if raw else {}
+            header = response.headers.get("X-OAuth-Scopes")
+            scopes = sorted({part.strip() for part in header.split(",") if part.strip()}) if header is not None else None
+            return {
+                "account": str(account_data.get("login") or ""),
+                "scope_status": "confirmed" if header is not None else "unavailable",
+                "oauth_scopes": scopes,
+                "scope_header_available": header is not None,
+                "checked_at": int(time.time()),
+            }
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise RuntimeError("O GitHub rejeitou o token. A autorização pode ter expirado ou sido revogada.")
+        raise RuntimeError("O GitHub recusou a consulta de permissões (HTTP %s)." % exc.code)
+    except urllib.error.URLError:
+        raise RuntimeError("Não foi possível alcançar o GitHub para consultar as permissões.")
+    except (TimeoutError, socket.timeout):
+        raise RuntimeError("O GitHub demorou demais para responder.")
+
+
 def _cipher():
     import hashlib
     secret = (os.getenv("APP_SECRET") or "").encode()
