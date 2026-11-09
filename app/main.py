@@ -16,7 +16,7 @@ from .models import Conversation, Message, Memory, UploadedFile
 from .security import make_session, require_auth
 from .llm import answer
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Mikael AI", version=APP_VERSION)
@@ -35,6 +35,11 @@ class ChatBody(BaseModel):
 class MemoryBody(BaseModel):
     content: str = Field(min_length=2, max_length=4000)
     category: str = Field(default="contexto", max_length=40)
+
+
+class GenerateFileBody(BaseModel):
+    filename: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=5, max_length=12000)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -223,6 +228,53 @@ async def upload(
     db.commit()
     db.refresh(item)
     return {"id": item.id, "filename": name, "characters": len(text)}
+
+
+@app.post("/api/files/generate")
+def generate_file(
+    body: GenerateFileBody, _: None = Depends(require_auth), db: Session = Depends(get_db)
+):
+    filename = Path(body.filename.strip()).name
+    ext = Path(filename).suffix.lower()
+    text_extensions = ALLOWED - {".pdf", ".docx"}
+    if not filename or ext not in text_extensions:
+        raise HTTPException(415, "Use uma extensão de texto ou código permitida, como .py, .java, .js, .json ou .md.")
+    prompt = (
+        "Gere o conteúdo completo de um único arquivo de código ou texto conforme a solicitação. "
+        "Retorne SOMENTE o conteúdo final do arquivo, sem cercas Markdown, sem explicações e sem bloco de código. "
+        "Não afirme que executou ou testou o conteúdo. Se a solicitação for ambígua, faça a melhor implementação "
+        "segura e inclua comentários úteis quando apropriado.\n\n"
+        f"NOME DO ARQUIVO: {filename}\nSOLICITAÇÃO:\n{body.description}"
+    )
+    try:
+        content = answer([{"role": "user", "content": prompt}]).strip()
+    except Exception as exc:
+        detail = str(exc)
+        detail = re.sub(r"(?i)(sk-or-v1-|sk-[A-Za-z0-9_-]{8,})[A-Za-z0-9_-]*", "[CHAVE_OCULTA]", detail)
+        logging.error("Falha ao gerar arquivo (%s): %s", type(exc).__name__, detail[:1200])
+        raise HTTPException(502, "Não foi possível gerar o arquivo com o provedor de IA.")
+    if not content:
+        raise HTTPException(502, "A IA retornou um arquivo vazio. Tente novamente.")
+    if len(content.encode("utf-8")) > 1024 * 1024:
+        raise HTTPException(413, "O arquivo gerado excedeu o limite de 1 MB.")
+    item = UploadedFile(filename=filename, extracted_text=content)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "filename": item.filename, "characters": len(content)}
+
+
+@app.get("/api/files/{file_id}/download")
+def download_file(file_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.get(UploadedFile, file_id)
+    if not item:
+        raise HTTPException(404, "Arquivo não encontrado.")
+    safe_name = Path(item.filename).name.replace('"', "")
+    return Response(
+        content=item.extracted_text,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+    )
 
 
 @app.get("/api/files")
