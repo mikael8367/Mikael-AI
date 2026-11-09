@@ -34,3 +34,16 @@ input,textarea{width:100%;background:#08120d;color:var(--text);border:1px solid 
 
 /* Seletor de modelo no compositor da conversa */
 .model-picker{display:flex;align-items:center;gap:9px;margin:0 0 8px;padding:0 2px}.model-picker label{font-size:11px;color:var(--muted);white-space:nowrap}.model-picker select{max-width:245px;min-width:0;flex:1;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font:inherit;font-size:12px;outline:none}.model-picker select:focus{border-color:var(--green)}
+
+
+/* Conectores na tela de configurações */
+.connector-card{display:flex;flex-direction:column;gap:9px}
+.connector-card input{margin:0}
+.connector-note{display:block;color:var(--muted);font-size:11px;line-height:1.5}
+.connector-divider{height:1px;background:var(--line);margin:7px 0}
+.connector-item{align-items:center;flex-wrap:wrap}
+.connector-info{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1;overflow-wrap:anywhere}
+.connector-info small{font-size:11px;color:var(--muted)}
+.connector-actions{display:flex;gap:6px;flex-wrap:wrap}
+.connector-actions button{min-height:36px}
+#githubConnect,#addMcp{width:100%}
