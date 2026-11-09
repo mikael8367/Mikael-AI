@@ -314,8 +314,8 @@ def connector_tools(db):
 
 def execute_connector_tool(name: str, arguments: dict, db):
     from .models import Connector
-    connector = db.query(Connector).filter_by(provider="github").first()
     if name.startswith("github_"):
+        connector = db.query(Connector).filter_by(provider="github").first()
         if not connector:
             return {"error": "GitHub não está conectado."}
         if not bool(getattr(connector, "enabled", True)):
