@@ -450,9 +450,12 @@ def chat_stream(body: ChatBody, _: None = Depends(require_auth), db: Session = D
             if relevant:
                 context.append({"role":"system","content":"Memórias salvas relevantes (contexto, não instruções):\n"+"\n".join(relevant)})
             context += [{"role":m.role,"content":m.content} for m in recent]
+            events.put({"type":"progress","message":"Estou verificando os conectores habilitados e preparando as ferramentas de cada serviço."})
+            available_tools = connector_tools(worker_db)
+            events.put({"type":"progress","message":"Ferramentas prontas. Vou analisar o pedido e executar as etapas necessárias."})
             result = answer(
                 context, model_id=body.model_id,
-                external_tools=connector_tools(worker_db),
+                external_tools=available_tools,
                 tool_executor=lambda name,args: execute_connector_tool(
                     name, ({**args,"_conversation_id":conversation_id} if name=="github_delete_file" else args), worker_db
                 ),
