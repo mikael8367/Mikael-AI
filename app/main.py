@@ -353,7 +353,7 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.add(Message(conversation_id=c.id, role="user", content=body.message))
     db.commit()
     try:
-        result = answer(context, model_id=body.model_id, external_tools=connector_tools(db), tool_executor=lambda name, args: execute_connector_tool(name, {**args, "_conversation_id": c.id}, db))
+        result = answer(context, model_id=body.model_id, external_tools=connector_tools(db), tool_executor=lambda name, args: execute_connector_tool(name, ({**args, "_conversation_id": c.id} if name == "github_delete_file" else args), db))
     except HTTPException:
         raise
     except Exception as exc:
