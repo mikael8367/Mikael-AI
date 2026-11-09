@@ -151,8 +151,8 @@ async function startLongWork(goal,duration){
     $('currentConversationLabel').textContent='Conversa atual: trabalho prolongado';
     workStatusReceivedAt=Date.now();renderLongWork(task);
     await loadConversations();
+    await openConversation(task.conversation_id);
     toast('Trabalho iniciado. Mantenha esta aba aberta para continuar.');
-    showTab('chat');
   }catch(error){toast('Não foi possível iniciar: '+error.message)}
   finally{button.disabled=false}
 }
