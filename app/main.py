@@ -1,4 +1,4 @@
-import os, re, logging
+import os, re, logging, mimetypes
 from pathlib import Path
 from io import BytesIO
 
@@ -160,6 +160,8 @@ def chat(body: ChatBody, _: None = Depends(require_auth), db: Session = Depends(
     db.commit()
     try:
         result = answer(context)
+    except HTTPException:
+        raise
     except Exception as exc:
         # Registra o motivo técnico sem expor credenciais nos logs.
         detail = str(exc)
@@ -239,13 +241,14 @@ async def upload(
         ".webp": ("image/webp", raw.startswith(b"RIFF") and raw[8:12] == b"WEBP"),
         ".gif": ("image/gif", raw.startswith((b"GIF87a", b"GIF89a"))),
     }
-    mime_type = None
+    image_mime_type = None
     if ext in image_types:
-        mime_type, valid_image = image_types[ext]
+        image_mime_type, valid_image = image_types[ext]
         if not valid_image:
             raise HTTPException(400, "O conteúdo enviado não corresponde a uma imagem válida.")
         if len(raw) > 5 * 1024 * 1024:
             raise HTTPException(413, "Fotos têm limite de 5 MB para análise pela IA.")
+    mime_type = image_mime_type or mimetypes.guess_type(name)[0] or "application/octet-stream"
     try:
         extracted = extract_text(name, raw)[:250000]
     except Exception:
