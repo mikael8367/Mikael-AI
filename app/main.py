@@ -12,12 +12,12 @@ from pypdf import PdfReader
 from docx import Document
 
 from .db import Base, engine, get_db, SessionLocal
-from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction
+from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction, WorkTask
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
 
-APP_VERSION = "1.14.1"
+APP_VERSION = "1.15.0"
 
 Base.metadata.create_all(bind=engine)
 
@@ -415,6 +415,225 @@ def deny_action(action_id: int, _: None = Depends(require_auth), db: Session = D
     action.status = "denied"
     db.commit()
     return {"ok": True, "message": "Exclusão negada. Nenhum arquivo foi apagado."}
+
+
+
+# Tarefas longas: persistidas no banco e executadas apenas enquanto a aba mantiver a sessão ativa.
+WORK_THREADS = {}
+WORK_THREADS_LOCK = threading.Lock()
+MAX_WORK_SECONDS = 3 * 60 * 60
+
+class WorkStartBody(BaseModel):
+    goal: str = Field(min_length=5, max_length=12000)
+    duration_seconds: int = Field(default=10800, ge=60, le=10800)
+    conversation_id: int | None = None
+    model_id: str = Field(default="mikael", pattern="^(mikael|deepseek|gpt4o_mini)$")
+
+def _work_payload(task):
+    return {
+        "id": task.id, "conversation_id": task.conversation_id, "goal": task.goal,
+        "status": task.status, "remaining_seconds": max(0, int(task.remaining_seconds or 0)),
+        "progress": task.progress or "", "result": task.result or "",
+    }
+
+def _run_work_task(task_id):
+    with WORK_THREADS_LOCK:
+        WORK_THREADS[task_id] = threading.current_thread()
+    worker_db = SessionLocal()
+    try:
+        rounds = 0
+        while rounds < 180:
+            task = worker_db.get(WorkTask, task_id)
+            if not task or task.status != "running":
+                break
+            if int(task.remaining_seconds or 0) <= 0:
+                task.status = "completed"
+                task.progress = "Prazo concluído. Revisão finalizada."
+                worker_db.commit()
+                break
+            task.cycle_started_at = int(time.time())
+            worker_db.commit()
+            started = int(task.cycle_started_at)
+            conversation_id = task.conversation_id
+            recent = worker_db.scalars(
+                select(Message).where(Message.conversation_id == conversation_id)
+                .order_by(Message.id.desc()).limit(16)
+            ).all()
+            recent.reverse()
+            context = [
+                {"role":"system","content":(
+                    "MODO DE TRABALHO CONTÍNUO. O usuário autorizou trabalhar no objetivo abaixo pelo tempo ativo restante. "
+                    "Execute uma etapa concreta por ciclo usando somente ferramentas habilitadas. Leia antes de editar, "
+                    "preserve o projeto, valide cada alteração e registre progresso factual. Não repita etapas já concluídas. "
+                    "Não afirme que algo foi testado sem testar. Não faça exclusões sem aprovação explícita. "
+                    "Se não houver uma próxima ação segura ou faltar acesso, explique o bloqueio e não invente trabalho. "
+                    "Ao final de cada ciclo, escreva um relatório curto do que realmente fez e a próxima etapa."
+                )},
+                *[{"role":m.role,"content":m.content} for m in recent],
+                {"role":"user","content":(
+                    "Objetivo autorizado: "+task.goal+
+                    "\nContinue o trabalho a partir do histórico. Faça agora a próxima etapa útil e verificável; "
+                    "não encerre a sessão só porque concluiu uma etapa. Não repita ações já feitas."
+                )}
+            ]
+            tools = connector_tools(worker_db)
+            result = answer(
+                context, model_id=task.model_id, external_tools=tools,
+                tool_executor=lambda name,args: execute_connector_tool(
+                    name, ({**args,"_conversation_id":conversation_id} if name=="github_delete_file" else args), worker_db
+                ),
+                progress_callback=lambda message: _update_work_progress(task_id, message),
+            )
+            worker_db.expire_all()
+            task = worker_db.get(WorkTask, task_id)
+            if not task:
+                break
+            if task.status != "running":
+                task.cycle_started_at = None
+                worker_db.commit()
+                break
+            elapsed = max(1, int(time.time()) - int(task.cycle_started_at or started))
+            task.remaining_seconds = max(0, int(task.remaining_seconds or 0) - elapsed)
+            task.cycle_started_at = None
+            task.progress = (result or "Ciclo concluído.")[:1200]
+            worker_db.add(Message(conversation_id=conversation_id, role="assistant", content=result or "Ciclo concluído sem texto de resposta."))
+            if task.remaining_seconds <= 0:
+                task.status = "completed"
+                task.result = (result or "")[:12000]
+                task.progress = "Tempo de trabalho concluído. Resultado salvo na conversa."
+            worker_db.commit()
+            rounds += 1
+            if task.status == "completed":
+                break
+            time.sleep(3)
+        else:
+            task = worker_db.get(WorkTask, task_id)
+            if task and task.status == "running":
+                task.status = "paused"
+                task.cycle_started_at = None
+                task.progress = "Limite de ciclos atingido; tarefa pausada com progresso salvo."
+                worker_db.commit()
+    except Exception as exc:
+        worker_db.rollback()
+        task = worker_db.get(WorkTask, task_id)
+        if task and task.status == "running":
+            task.status = "paused"
+            task.cycle_started_at = None
+            task.progress = "A tarefa foi pausada por uma falha. O progresso anterior foi salvo."
+            worker_db.commit()
+        logging.error("Falha na tarefa prolongada (%s): %s", type(exc).__name__, str(exc)[:500])
+    finally:
+        worker_db.close()
+        with WORK_THREADS_LOCK:
+            if WORK_THREADS.get(task_id) is threading.current_thread():
+                WORK_THREADS.pop(task_id, None)
+
+def _update_work_progress(task_id, message):
+    db = SessionLocal()
+    try:
+        task = db.get(WorkTask, task_id)
+        if task and task.status == "running":
+            task.progress = str(message)[:1200]
+            db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+def _launch_work_thread(task_id):
+    with WORK_THREADS_LOCK:
+        current = WORK_THREADS.get(task_id)
+        if current and current.is_alive():
+            return
+        thread = threading.Thread(target=_run_work_task, args=(task_id,), daemon=True)
+        WORK_THREADS[task_id] = thread
+        thread.start()
+
+@app.post("/api/work/start")
+def start_long_work(body: WorkStartBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    active = db.scalars(select(WorkTask).where(WorkTask.status.in_(["running","paused"])).order_by(WorkTask.id.desc())).first()
+    if active:
+        raise HTTPException(409, "Já existe uma tarefa prolongada. Continue ou cancele a tarefa atual antes de iniciar outra.")
+    conversation = db.get(Conversation, body.conversation_id) if body.conversation_id else None
+    if body.conversation_id and not conversation:
+        raise HTTPException(404, "Conversa não encontrada.")
+    if not conversation:
+        conversation = Conversation(title=body.goal[:55])
+        db.add(conversation)
+        db.commit()
+        db.refresh(conversation)
+    db.add(Message(conversation_id=conversation.id, role="user", content="Tarefa de trabalho prolongado: "+body.goal))
+    task = WorkTask(
+        conversation_id=conversation.id, goal=body.goal, model_id=body.model_id,
+        status="running", remaining_seconds=min(MAX_WORK_SECONDS, body.duration_seconds),
+        progress="Preparando a primeira etapa."
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    _launch_work_thread(task.id)
+    return _work_payload(task)
+
+@app.get("/api/work/current")
+def current_long_work(_: None = Depends(require_auth), db: Session = Depends(get_db)):
+    task = db.scalars(select(WorkTask).where(WorkTask.status.in_(["running","paused"])).order_by(WorkTask.id.desc())).first()
+    if not task:
+        task = db.scalars(select(WorkTask).order_by(WorkTask.id.desc())).first()
+    if not task:
+        return None
+    if task.status == "running":
+        with WORK_THREADS_LOCK:
+            alive = bool(WORK_THREADS.get(task.id) and WORK_THREADS[task.id].is_alive())
+        if not alive:
+            task.status = "paused"
+            task.cycle_started_at = None
+            task.progress = "A execução foi interrompida (por exemplo, reinício do servidor). Continue para retomar."
+            db.commit()
+    return _work_payload(task)
+
+@app.post("/api/work/{task_id}/pause")
+def pause_long_work(task_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    task = db.get(WorkTask, task_id)
+    if not task:
+        raise HTTPException(404, "Tarefa não encontrada.")
+    if task.status == "running":
+        if task.cycle_started_at:
+            elapsed = max(0, int(time.time()) - int(task.cycle_started_at))
+            task.remaining_seconds = max(0, int(task.remaining_seconds or 0) - elapsed)
+        task.cycle_started_at = None
+        task.status = "paused"
+        task.progress = "Trabalho pausado. O progresso foi salvo; toque em Continuar para retomar."
+        db.commit()
+    return _work_payload(task)
+
+@app.post("/api/work/{task_id}/resume")
+def resume_long_work(task_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    task = db.get(WorkTask, task_id)
+    if not task:
+        raise HTTPException(404, "Tarefa não encontrada.")
+    if task.status != "paused":
+        raise HTTPException(409, "Esta tarefa não está pausada.")
+    if task.remaining_seconds <= 0:
+        task.status = "completed"
+        db.commit()
+        return _work_payload(task)
+    task.status = "running"
+    task.progress = "Retomando do último progresso salvo."
+    db.commit()
+    _launch_work_thread(task.id)
+    return _work_payload(task)
+
+@app.post("/api/work/{task_id}/cancel")
+def cancel_long_work(task_id: int, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    task = db.get(WorkTask, task_id)
+    if not task:
+        raise HTTPException(404, "Tarefa não encontrada.")
+    if task.status not in {"completed","cancelled"}:
+        task.status = "cancelled"
+        task.cycle_started_at = None
+        task.progress = "Tarefa cancelada pelo usuário. O progresso já realizado permanece salvo."
+        db.commit()
+    return _work_payload(task)
 
 
 @app.post("/api/chat/stream")
