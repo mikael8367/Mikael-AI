@@ -4,17 +4,19 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
-    private val siteUrl = "https://mikael-ai.onrender.com"
+    private val siteHost = "mikael-ai.onrender.com"
+    private val siteUrl = "https://$siteHost"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,8 +27,16 @@ class MainActivity : Activity() {
         web.settings.allowFileAccess = false
         web.settings.allowContentAccess = false
         web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val uri = request.url
+                if (uri.scheme == "https" && uri.host == siteHost) return false
+                if (uri.scheme == "https" || uri.scheme == "http") {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString())))
+                }
+                return true
+            }
             override fun onPageFinished(view: WebView, url: String) {
-                if (url.startsWith(siteUrl)) injectNativeWorkHooks(view)
+                if (Uri.parse(url).host == siteHost) injectNativeWorkHooks(view)
             }
         }
         web.webChromeClient = WebChromeClient()
@@ -47,28 +57,45 @@ class MainActivity : Activity() {
             (() => {
               if (window.__mikaelNativeHooks) return;
               window.__mikaelNativeHooks = true;
+              // No app Android, esconder a WebView não deve acionar a pausa automática do site.
+              try {
+                Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+                Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+              } catch (_) {}
               const originalFetch = window.fetch.bind(window);
               window.fetch = async (...args) => {
                 const requestUrl = String(args[0]?.url || args[0] || '');
-                const response = await originalFetch(...args);
-                if (/\/api\/work\/\d+\/(pause|resume|cancel)/.test(requestUrl)) {
-                  try {
-                    const clone = response.clone();
-                    const task = await clone.json();
-                    if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
-                    else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
-                    else if (task.status === 'paused') window.MikaelNative?.workPaused();
-                  } catch (_) {}
+                try {
+                  const response = await originalFetch(...args);
+                  if (/\/api\/work\/start$/.test(requestUrl)) {
+                    if (!response.ok) window.MikaelNative?.workFinished('failed');
+                    else {
+                      try {
+                        const task = await response.clone().json();
+                        if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
+                        else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                      } catch (_) {}
+                    }
+                  } else if (/\/api\/work\/current$/.test(requestUrl) && response.ok) {
+                    try {
+                      const task = await response.clone().json();
+                      if (task && task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
+                      else if (task && ['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                      else if (task && task.status === 'paused') window.MikaelNative?.workPaused();
+                    } catch (_) {}
+                  } else if (/\/api\/work\/\d+\/(pause|resume|cancel)$/.test(requestUrl) && response.ok) {
+                    try {
+                      const task = await response.clone().json();
+                      if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
+                      else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
+                      else if (task.status === 'paused') window.MikaelNative?.workPaused();
+                    } catch (_) {}
+                  }
+                  return response;
+                } catch (error) {
+                  if (/\/api\/work\/start$/.test(requestUrl)) window.MikaelNative?.workFinished('failed');
+                  throw error;
                 }
-                if (/\/api\/work\/\d+$/.test(requestUrl) && response.ok) {
-                  try {
-                    const task = await response.clone().json();
-                    if (task.status === 'running') window.MikaelNative?.workStarted(task.progress || 'Trabalho em andamento');
-                    else if (['completed','cancelled','failed'].includes(task.status)) window.MikaelNative?.workFinished(task.status);
-                    else if (task.status === 'paused') window.MikaelNative?.workPaused();
-                  } catch (_) {}
-                }
-                return response;
               };
               const start = document.getElementById('startLongWork');
               if (start) start.addEventListener('click', () => window.MikaelNative?.workStarted('Preparando trabalho'), true);
@@ -89,8 +116,8 @@ class MainActivity : Activity() {
         @JavascriptInterface fun workFinished(status: String) {
             runOnUiThread {
                 stopService(Intent(this@MainActivity, WorkNotificationService::class.java))
-                val title = if (status == "completed") "Mikael AI concluiu o trabalho" else "Trabalho da Mikael AI encerrado"
-                WorkNotificationService.showFinished(this@MainActivity, title)
+                if (status == "completed") WorkNotificationService.showFinished(this@MainActivity, "Mikael AI concluiu o trabalho")
+                else if (status == "failed") WorkNotificationService.showFinished(this@MainActivity, "O trabalho da Mikael AI falhou")
             }
         }
         @JavascriptInterface fun workPaused() {
@@ -105,6 +132,7 @@ class MainActivity : Activity() {
         web.saveState(outState)
         super.onSaveInstanceState(outState)
     }
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
     }
