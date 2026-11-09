@@ -18,7 +18,32 @@ $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:J
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
 $('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+async function handleChatFiles(event){
+  const selected=Array.from(event.target.files||[]);
+  event.target.value='';
+  if(!selected.length)return;
+  if(selected.length>10){toast('Envie no máximo 10 arquivos por vez.');return}
+  showTab('chat');
+  const messages=$('messages');
+  if(messages.querySelector('.welcome-msg'))messages.innerHTML='';
+  bubble('user','📎 Enviando '+selected.length+' arquivo(s)/imagem(ns) para análise: '+selected.map(f=>f.name).join(', '));
+  for(const file of selected){
+    const status=bubble('assistant','Recebendo '+file.name+'...');
+    try{
+      const form=new FormData();form.append('file',file);
+      const uploaded=await api('/api/upload',{method:'POST',body:form});
+      status.textContent='Analisando '+uploaded.filename+'...';
+      const result=await api('/api/files/'+uploaded.id+'/analyze',{method:'POST'});
+      status.textContent='Análise de '+uploaded.filename+':\\n\\n'+(result.analysis||'A IA não retornou uma análise.');
+    }catch(error){
+      status.textContent='Não foi possível analisar '+file.name+': '+error.message;
+    }
+  }
+  await loadFiles();
+}
 $('sendBtn').onclick=send;$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+$('attachBtn').onclick=()=>{if(!isSending)$('chatFileInput').click()};
+$('chatFileInput').onchange=handleChatFiles;
 $('newChat').onclick=newConversation;$('startChat').onclick=()=>{showTab('chat');newConversation();$('prompt').focus()};
 document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{showTab('chat');resetChat();$('prompt').value=b.dataset.prompt;$('prompt').focus()});
 $('generateFile').onclick=generateFile;$('fileInput').onchange=async e=>{const selected=Array.from(e.target.files||[]);if(!selected.length)return;if(selected.length>10){toast('Envie no máximo 10 arquivos por vez.');e.target.value='';return}let sent=0;const errors=[];for(const file of selected){const form=new FormData();form.append('file',file);try{await api('/api/upload',{method:'POST',body:form});sent++}catch(err){errors.push(file.name+': '+err.message)}}e.target.value='';await loadFiles();if(errors.length)toast(sent+' enviado(s). Falhas: '+errors.slice(0,2).join(' | '));else toast(sent+' arquivo(s)/foto(s) enviado(s) com sucesso')};
