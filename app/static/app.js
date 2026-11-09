@@ -66,6 +66,8 @@ async function loadConnectors(){
     list.innerHTML='';
     const github=rows.find(x=>x.provider==='github');
     $('githubStatus').textContent=github?(github.enabled?'Conectado e ativo como @':'Conectado, mas desativado · @')+github.account:'Ainda não há uma conta GitHub conectada.';
+    if(!github){$('githubPermissions').textContent='Conecte uma conta GitHub para consultar as permissões.';}
+    else{await loadGitHubPermissions();}
     if(!rows.length){list.textContent='Nenhum conector conectado.';return}
     rows.forEach(item=>{
       const card=document.createElement('article');card.className='list-item connector-item'+(item.enabled?'':' connector-disabled');
@@ -89,6 +91,54 @@ async function loadConnectors(){
     });
   }catch(e){list.textContent='Não foi possível carregar os conectores.';toast(e.message)}
 }
+function permissionScopeDescription(scope){
+  const descriptions={
+    'read:user':'Ler dados básicos do perfil GitHub.',
+    'repo':'Acesso amplo a repositórios públicos e privados, conforme permissões da conta. Não significa que todas as operações estejam disponíveis na Mikael AI.',
+    'workflow':'Gerenciar arquivos de workflow do GitHub Actions. A Mikael AI ainda não oferece ferramentas para executar workflows ou consultar seus logs.'
+  };
+  return descriptions[scope]||'Escopo OAuth concedido pelo GitHub; consulte a documentação oficial para o alcance detalhado.';
+}
+async function loadGitHubPermissions(){
+  const container=$('githubPermissions');
+  if(!container)return;
+  container.textContent='Consultando o GitHub...';
+  try{
+    const report=await api('/api/connectors/github/permissions');
+    container.innerHTML='';
+    const status=document.createElement('div');
+    status.className='permission-status '+(report.scope_status==='confirmed'?'confirmed':'unknown');
+    status.textContent=report.scope_status==='confirmed'?'Escopos OAuth confirmados pelo GitHub':'O GitHub não informou o cabeçalho de escopos nesta consulta.';
+    container.append(status);
+    const scopeTitle=document.createElement('b');scopeTitle.textContent='Escopos OAuth concedidos';container.append(scopeTitle);
+    const scopes=document.createElement('div');scopes.className='permission-list';
+    if(report.scope_status==='confirmed'&&Array.isArray(report.oauth_scopes)&&report.oauth_scopes.length){
+      report.oauth_scopes.forEach(scope=>{
+        const item=document.createElement('div');item.className='permission-item';
+        const name=document.createElement('b');name.textContent=scope;
+        const detail=document.createElement('small');detail.textContent=permissionScopeDescription(scope);
+        item.append(name,detail);scopes.append(item);
+      });
+    }else{
+      const empty=document.createElement('small');empty.textContent=report.scope_status==='confirmed'?'O GitHub confirmou que não há escopos listados.':'Não é possível afirmar quais escopos foram concedidos sem o cabeçalho X-OAuth-Scopes.';
+      scopes.append(empty);
+    }
+    container.append(scopes);
+    const toolsTitle=document.createElement('b');toolsTitle.className='permission-section-title';toolsTitle.textContent='Ferramentas disponíveis na Mikael AI';container.append(toolsTitle);
+    const tools=document.createElement('ul');tools.className='permission-bullets';
+    (report.available_tools||[]).forEach(tool=>{const li=document.createElement('li');li.textContent=tool.label;tools.append(li)});
+    container.append(tools);
+    const blockedTitle=document.createElement('b');blockedTitle.className='permission-section-title';blockedTitle.textContent='Não disponíveis como ferramentas';container.append(blockedTitle);
+    const blocked=document.createElement('ul');blocked.className='permission-bullets muted';
+    (report.not_exposed||[]).forEach(item=>{const li=document.createElement('li');li.textContent=item.label+' — '+item.detail;blocked.append(li)});
+    container.append(blocked);
+    const notice=document.createElement('p');notice.className='permission-notice';notice.textContent=report.scope_notice||'Escopos OAuth e ferramentas da interface são coisas diferentes.';container.append(notice);
+    const checked=document.createElement('small');checked.className='connector-note';checked.textContent='Conta: @'+(report.account||'desconhecida')+' · Verificado: '+new Date(Number(report.checked_at)*1000).toLocaleString('pt-BR');container.append(checked);
+    if(!report.enabled){const disabled=document.createElement('small');disabled.className='permission-warning';disabled.textContent='O conector está desabilitado. A consulta de permissões foi feita apenas para transparência; as ferramentas não podem ser usadas até habilitar.';container.append(disabled);}
+  }catch(error){
+    container.textContent='Não foi possível consultar as permissões: '+error.message;
+  }
+}
 async function addMcpConnector(){
   const name=$('mcpName').value.trim(),endpoint=$('mcpEndpoint').value.trim(),token=$('mcpToken').value;
   if(name.length<2||!endpoint){toast('Informe um nome e o endereço HTTPS do servidor MCP.');return}
@@ -110,6 +160,7 @@ $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael',
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
 $('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};
+$('githubPermissionsRefresh').onclick=loadGitHubPermissions;
 $('addMcp').onclick=addMcpConnector;
 $('logoutBtn').onclick=async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}};
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
