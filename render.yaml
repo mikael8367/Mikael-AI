@@ -25,6 +25,12 @@ services:
         value: deepseek/deepseek-v4.1-flash
       - key: LLM_REASONING_EFFORT
         value: high
+      - key: LLM_WEB_SEARCH_ENABLED
+        value: true
+      - key: LLM_WEB_SEARCH_ENGINE
+        value: exa
+      - key: LLM_WEB_SEARCH_MAX_RESULTS
+        value: 5
       - key: MAX_UPLOAD_MB
         value: 8
 
