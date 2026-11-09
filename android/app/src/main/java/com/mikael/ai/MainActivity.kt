@@ -75,7 +75,7 @@ class MainActivity : Activity() {
                 try {
                   const response = await originalFetch(...args);
                   if (/\/api\/work\/start$/.test(requestUrl)) {
-                    if (!response.ok) window.MikaelNative?.workFinished('failed');
+                    if (!response.ok) window.MikaelNative?.workFinished('failed', 'start-error');
                     else {
                       try {
                         const task = await response.clone().json();
@@ -100,7 +100,7 @@ class MainActivity : Activity() {
                   }
                   return response;
                 } catch (error) {
-                  if (/\/api\/work\/start$/.test(requestUrl)) window.MikaelNative?.workFinished('failed');
+                  if (/\/api\/work\/start$/.test(requestUrl)) window.MikaelNative?.workFinished('failed', 'start-error');
                   throw error;
                 }
               };
