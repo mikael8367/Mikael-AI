@@ -125,6 +125,10 @@ MODEL_PRESETS = {
     "mikael": None,
     "deepseek": "deepseek/deepseek-v4.1-flash",
     "gpt4o_mini": "openai/gpt-4o-mini",
+    "gemini_flash": "google/gemini-2.5-flash",
+    "claude_sonnet": "anthropic/claude-sonnet-4.5",
+    "qwen_coder": "qwen/qwen3-coder-plus",
+    "gpt5_mini": "openai/gpt-5-mini",
 }
 
 def answer(messages, model_id="mikael", external_tools=None, tool_executor=None, progress_callback=None):
