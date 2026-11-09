@@ -12,7 +12,7 @@ Assistente de programação com backend FastAPI, interface mobile, autenticaçã
 - Modelo DeepSeek V4.1 Flash com nível de raciocínio configurável.
 - Pesquisa na web sob demanda pelo OpenRouter, com links das fontes incluídos nas respostas.
 - Geração de imagens na conversa via OpenRouter; imagens geradas ficam salvas na aba Arquivos.
-- Conector GitHub por OAuth, com leitura de repositórios, arquivos e issues.
+- Conector GitHub por OAuth, com leitura e escrita de arquivos, criação de issues e pull requests em repositórios autorizados.
 - Cadastro de servidores MCP remotos por HTTPS, com segredo armazenado criptografado e exposição limitada a ferramentas aparentemente somente de leitura.
 - Interface mobile com abas inferiores animadas e versão visível no canto inferior direito.
 - Autenticação por senha e cookie HttpOnly.
@@ -52,7 +52,9 @@ A tela Configurações permite conectar o GitHub e cadastrar servidores MCP remo
 6. No Render, abra Environment do serviço e configure `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET`. Configure `GITHUB_REDIRECT_URI` com a URL de callback acima.
 7. Abra Configurações no site e toque em **Conectar conta GitHub**.
 
-A autorização solicita `read:user` e `repo` para permitir leitura de repositórios privados e públicos. Embora o escopo OAuth `repo` seja amplo, as ferramentas atualmente expostas pela Mikael AI são somente de leitura: listar repositórios, ler arquivos e listar issues. Não há ferramentas de escrita, exclusão ou criação de commits.
+A autorização solicita `read:user`, `repo` e `workflow`. O escopo `repo` permite leitura e escrita nos repositórios públicos e privados aos quais sua conta já tem acesso; `workflow` permite criar ou atualizar arquivos de GitHub Actions. A Mikael AI pode listar repositórios, ler arquivos e issues, criar/atualizar arquivos (gerando commits), criar issues e abrir pull requests. Ela não recebe permissão para apagar repositórios nem para administrar toda a conta GitHub. Permissões efetivas também dependem das regras da organização, SSO e permissões que você já possui.
+
+Se você já conectou o GitHub antes da versão 1.9.0, desconecte e conecte novamente depois do deploy para o GitHub mostrar a solicitação de `workflow`. A autorização atualizada precisa ser aprovada na tela oficial do GitHub.
 
 ### Adicionar um servidor MCP
 Informe nome, URL HTTPS pública do endpoint MCP Streamable HTTP e, se necessário, um token Bearer no campo próprio. O token é criptografado no servidor usando uma chave derivada de `APP_SECRET`; não é enviado de volta ao navegador. Não cole senhas de conta nem tokens no chat. Por segurança, endpoints locais, HTTP simples e IPs privados são rejeitados. Ferramentas MCP são filtradas para expor apenas nomes que aparentam ser de leitura; isso não substitui a revisão das permissões e da confiabilidade do servidor.
