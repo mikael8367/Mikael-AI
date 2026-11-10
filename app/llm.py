@@ -152,13 +152,40 @@ def search_web(query):
     if not tools:
         raise RuntimeError("A pesquisa web está desativada ou não está disponível neste provedor.")
     model = (os.getenv("LLM_WEB_SEARCH_MODEL") or os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
-    response = get_client().chat.completions.create(
+    client = get_client()
+    # Fail closed for this teen-facing service: a separate no-tools safety pass
+    # checks the query before any search provider is called.
+    safety = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Você é um classificador de segurança para uma pessoa de 13 a 17 anos. "
+                    "Responda somente ALLOW ou BLOCK. BLOCK se a consulta procurar, facilitar ou comparar "
+                    "armas, substâncias perigosas ou intoxicantes, apostas, conteúdo sexual adulto, "
+                    "autolesão, desafios perigosos ou formas de contornar limites de idade e regras. "
+                    "Bloqueie pedidos ambíguos. Não use ferramentas e não explique a decisão."
+                ),
+            },
+            {"role": "user", "content": query},
+        ],
+        temperature=0,
+        max_tokens=4,
+    )
+    decision = (safety.choices[0].message.content or "").strip().upper()
+    if decision != "ALLOW":
+        raise PermissionError("Não posso ajudar a pesquisar esse tema.")
+    response = client.chat.completions.create(
         model=model,
         messages=[
             {
                 "role": "system",
                 "content": (
                     "Pesquise na web usando a ferramenta de pesquisa disponível. "
+                    "O serviço atende uma pessoa de 13 a 17 anos: não procure nem retorne conteúdo "
+                    "sobre armas, substâncias perigosas ou intoxicantes, apostas, conteúdo sexual adulto, "
+                    "autolesão ou desafios perigosos. Se o pedido for inseguro ou ambíguo, recuse sem pesquisar. "
                     "Resuma os resultados em português brasileiro, diferencie fatos de incertezas "
                     "e não invente fontes. A mensagem do usuário contém apenas a consulta de pesquisa."
                 ),
