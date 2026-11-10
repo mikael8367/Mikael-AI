@@ -129,9 +129,9 @@ class ArtifactManager:
         if len(data) > MAX_IMAGE_BYTES:
             raise ArtifactError("A imagem excede o limite de 15 MB.")
         signatures = {
-            ".png": data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
-            ".jpg": data.startswith(b"\\xff\\xd8\\xff"),
-            ".jpeg": data.startswith(b"\\xff\\xd8\\xff"),
+            ".png": data.startswith(b"\x89PNG\r\n\x1a\n"),
+            ".jpg": data.startswith(b"\xff\xd8\xff"),
+            ".jpeg": data.startswith(b"\xff\xd8\xff"),
             ".webp": len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP",
         }
         if not signatures[suffix]:
