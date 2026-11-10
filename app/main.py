@@ -241,7 +241,7 @@ def github_permissions(_: None = Depends(require_auth), db: Session = Depends(ge
             {"label": "Fazer merge de pull requests ou fechar issues/PRs", "detail": "Não existe ferramenta correspondente na interface."},
             {"label": "Administrar membros, colaboradores ou regras de proteção", "detail": "Não existe ferramenta correspondente na interface."},
             {"label": "Gerenciar secrets, webhooks, releases ou configurações", "detail": "Não existe ferramenta correspondente na interface."},
-            {"label": "Executar GitHub Actions ou consultar logs de workflows", "detail": "Ainda não há ferramenta para executar workflows ou consultar seus logs."},
+            {"label": "Aprovar ou cancelar execuções de GitHub Actions", "detail": "A Mikael AI pode consultar execuções e disparar workflows manuais; cancelar ou aprovar execuções ainda não está exposto."},
             {"label": "Excluir repositórios inteiros", "detail": "Não existe ferramenta correspondente na interface; excluir um arquivo é uma operação separada e exige aprovação."},
         ],
         "scope_notice": "Os escopos OAuth representam a autorização concedida ao aplicativo. Eles não são uma lista de botões/ferramentas da Mikael AI. O escopo repo é amplo; a interface expõe somente as ferramentas listadas acima.",
