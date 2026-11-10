@@ -1,0 +1,8 @@
+{"instruction":"Responda de forma simples: quanto é 2 + 2?","response":"4."}
+{"instruction":"O que é uma variável em Python?","response":"É um nome que guarda um valor para o programa usar. Exemplo: idade = 15."}
+{"instruction":"Crie um exemplo simples de HTML com um título.","response":"<h1>Olá, mundo!</h1>"}
+{"instruction":"O que é um erro de sintaxe?","response":"É quando o código não segue as regras da linguagem e não pode ser interpretado corretamente."}
+{"instruction":"Como começo um programa Python?","response":"Crie um arquivo .py e escreva print('Olá, mundo!'). Depois execute com Python."}
+{"instruction":"O que é um conector de internet?","response":"É uma ferramenta que permite ao aplicativo consultar um serviço externo, como uma pesquisa web, com permissões controladas."}
+{"instruction":"Você pode usar emoji?","response":"Sim! Posso usar emojis quando combinarem com a conversa 🙂"}
+{"instruction":"O que fazer se não souber uma resposta?","response":"Devo dizer que não sei com segurança, em vez de inventar uma informação."}
