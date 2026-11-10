@@ -30,7 +30,7 @@ No Colab, selecione GPU quando disponível e execute as células em ordem. O not
 Comando equivalente:
 python sft_train.py --train data/programming_train.jsonl --val data/programming_val.jsonl --test data/programming_test.jsonl --epochs 100 --batch-size 8 --lr 0.00005 --patience 15 --min-delta 0.00001 --output checkpoints/programming
 
-O script salva o melhor checkpoint em checkpoints/programming/mikael-ai-v1-sft.pt e training_report.json. A avaliação de teste usa o checkpoint escolhido pela validação. Loss menor não garante código correto; revise e execute testes em ambiente isolado.
+O script salva o melhor checkpoint em checkpoints/programming/mikael-ai-v1-sft.pt e training_report.json. O primeiro ciclo real foi concluído: 71 épocas, 3.408 passos, melhor época 56, loss de validação 2,785875 e loss de teste 2,812893. Consulte [o relatório completo](reports/programming-training-2026-11-10.md) e [baixe o checkpoint pelo GitHub Actions](https://github.com/mikael8367/Mikael-AI/actions/runs/42742976139). A avaliação de teste usa o checkpoint escolhido pela validação. Loss menor não garante código correto; revise e execute testes em ambiente isolado.
 
 ## Criação e entrega de arquivos/imagens
 artifact_tools.py cria arquivos em uma pasta de saída controlada, sem aceitar caminhos arbitrários. Tipos de texto permitidos: TXT, MD, JSON, CSV, PY, JS, HTML, CSS, XML, YAML, JAVA, KT, C e CPP. Tipos de imagem: PNG, JPG, JPEG e WEBP. Há limites de tamanho, validação de extensão, assinatura real da imagem e nomes aleatórios para evitar sobrescrita.
