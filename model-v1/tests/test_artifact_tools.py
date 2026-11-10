@@ -6,7 +6,7 @@ import pytest
 from artifact_tools import ArtifactManager, ArtifactError, register_artifact_connectors
 from connectors import ConnectorRegistry
 
-PNG = b"\\x89PNG\\r\\n\\x1a\\n" + b"test-image"
+PNG = b"\x89PNG\r\n\x1a\n" + b"test-image"
 
 def test_create_text_file_returns_metadata_and_saves_utf8(tmp_path):
     manager = ArtifactManager(tmp_path, url_builder=lambda artifact_id: "/download/" + artifact_id)
