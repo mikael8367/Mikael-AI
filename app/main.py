@@ -572,15 +572,20 @@ def _launch_work_thread(task_id):
 def _send_work_notification(task_id):
     public_key = (os.getenv("VAPID_PUBLIC_KEY") or "").strip()
     private_key = (os.getenv("VAPID_PRIVATE_KEY") or "").strip()
-    subject = (os.getenv("VAPID_SUBJECT") or "mailto:admin@example.com").strip()
-    if not public_key or not private_key:
+    subject = (os.getenv("VAPID_SUBJECT") or "").strip()
+    if not public_key or not private_key or not (subject.startswith("mailto:") or subject.startswith("https://")):
         return
     db = SessionLocal()
     try:
         task = db.get(WorkTask, task_id)
-        if not task or task.status not in {"completed", "paused", "cancelled"}:
+        if not task or task.status not in {"running", "completed", "paused", "cancelled"}:
             return
-        title = "Mikael AI: trabalho concluído" if task.status == "completed" else "Mikael AI: trabalho pausado"
+        if task.status == "running":
+            title = "Mikael AI trabalhando em segundo plano"
+        elif task.status == "completed":
+            title = "Mikael AI: trabalho concluído"
+        else:
+            title = "Mikael AI: trabalho pausado"
         body = (task.progress or task.goal or "A tarefa foi atualizada.")[:180]
         payload = json.dumps({"title": title, "body": body, "url": "/"}, ensure_ascii=False)
         subscriptions = db.scalars(select(PushSubscription)).all()
@@ -622,8 +627,12 @@ def push_subscribe(body: PushSubscriptionBody, _: None = Depends(require_auth), 
     endpoint = body.endpoint.strip()
     keys = body.keys if isinstance(body.keys, dict) else {}
     p256dh, auth = keys.get("p256dh"), keys.get("auth")
-    if not endpoint.startswith("https://") or not isinstance(p256dh, str) or not isinstance(auth, str) or not p256dh or not auth:
-        raise HTTPException(422, "Inscrição de notificação inválida.")
+    parsed_endpoint = urllib.parse.urlsplit(endpoint)
+    host = (parsed_endpoint.hostname or "").lower()
+    trusted_push_hosts = ("fcm.googleapis.com", "updates.push.services.mozilla.com", "push.services.mozilla.com", "web.push.apple.com")
+    trusted_host = any(host == allowed or host.endswith("." + allowed) for allowed in trusted_push_hosts)
+    if parsed_endpoint.scheme != "https" or parsed_endpoint.username or parsed_endpoint.password or not trusted_host or not isinstance(p256dh, str) or not isinstance(auth, str) or not p256dh or not auth:
+        raise HTTPException(422, "Inscrição de notificação inválida ou provedor push não reconhecido.")
     item = db.scalars(select(PushSubscription).where(PushSubscription.endpoint == endpoint)).first()
     if item is None:
         item = PushSubscription(endpoint=endpoint, p256dh=p256dh[:512], auth=auth[:256])
@@ -690,6 +699,7 @@ def start_long_work(body: WorkStartBody, _: None = Depends(require_auth), db: Se
     db.commit()
     db.refresh(task)
     _launch_work_thread(task.id)
+    _send_work_notification(task.id)
     return _work_payload(task)
 
 @app.get("/api/work/current")
