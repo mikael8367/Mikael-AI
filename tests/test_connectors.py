@@ -7,7 +7,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.connectors import encrypt_secret, decrypt_secret, validate_mcp_endpoint, _safe_schema, execute_connector_tool, connector_tools, normalize_mcp_name, ensure_connector_enabled, github_permission_report, _connector_permissions, _connector_tool_enabled, GITHUB_TOOL_SPECS
-from app.models import PendingAction, Connector, UploadedFile
+from app.models import PendingAction, Connector, UploadedFile, PushSubscription
 
 
 class _ContextResponse:
@@ -79,6 +79,10 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertIn("github_list_branches", names)
         self.assertIn("github_create_branch", names)
         self.assertIn("github_list_pull_requests", names)
+        self.assertIn("github_upload_binary_file", names)
+        self.assertIn("github_list_workflows", names)
+        self.assertIn("github_list_workflow_runs", names)
+        self.assertIn("github_dispatch_workflow", names)
 
     def test_github_update_requires_sha_from_prior_read(self):
         github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
@@ -115,6 +119,62 @@ class ConnectorSecurityTests(unittest.TestCase):
             }, FakeDB())
         self.assertIn("excede 10.000 bytes", result["error"])
         self.assertEqual(request.call_count, 1)
+
+    def test_github_binary_upload_creates_file_with_valid_base64(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        import base64
+        payload = base64.b64encode(b"\x89PNG\r\n\x1a\nimage").decode("ascii")
+        with patch("app.connectors._http_json", side_effect=[
+            RuntimeError("O serviço externo recusou a solicitação (HTTP 404)."),
+            {"content":{"path":"images/logo.png"},"commit":{"html_url":"https://github.com/o/r/commit/abc"}}
+        ]) as request:
+            result = execute_connector_tool("github_upload_binary_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"images/logo.png",
+                "content_base64":payload,"message":"Add logo","branch":"feature"
+            }, FakeDB())
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["size"], len(b"\x89PNG\r\n\x1a\nimage"))
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args.kwargs["method"], "PUT")
+        self.assertEqual(base64.b64decode(request.call_args.kwargs["payload"]["content"]), b"\x89PNG\r\n\x1a\nimage")
+
+    def test_github_binary_upload_rejects_path_traversal_and_invalid_base64(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        with patch("app.connectors._http_json") as request:
+            bad_path = execute_connector_tool("github_upload_binary_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"../secrets.txt",
+                "content_base64":"YWJj","message":"Upload"
+            }, FakeDB())
+            bad_data = execute_connector_tool("github_upload_binary_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"assets/a.bin",
+                "content_base64":"not base64!!!","message":"Upload"
+            }, FakeDB())
+        self.assertIn("Caminho", bad_path["error"])
+        self.assertIn("Base64", bad_data["error"])
+        request.assert_not_called()
+
+    def test_push_subscription_model_has_required_browser_fields(self):
+        columns = PushSubscription.__table__.columns
+        self.assertIn("endpoint", columns)
+        self.assertIn("p256dh", columns)
+        self.assertIn("auth", columns)
+        self.assertTrue(columns["endpoint"].unique)
 
     def test_workspace_create_file_saves_text_artifact(self):
         class FakeDB:
