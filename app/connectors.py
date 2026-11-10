@@ -228,7 +228,7 @@ GITHUB_TOOL_SPECS = [
     {"name":"github_delete_file","label":"Solicitar exclusão de arquivo","description":"Cria uma solicitação pendente. O arquivo só será apagado depois da aprovação explícita na interface.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"}},"required":["owner","repo","path","message"],"additionalProperties":False}},
     {"name":"github_upload_binary_file","label":"Enviar arquivo binário","description":"Envia imagem, ZIP ou outro arquivo binário ao repositório usando conteúdo Base64. Para atualizar, leia o arquivo e informe expected_sha. Não apaga arquivos.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"content_base64":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"},"expected_sha":{"type":"string"}},"required":["owner","repo","path","content_base64","message"],"additionalProperties":False}},
     {"name":"github_list_workflows","label":"Listar GitHub Actions","description":"Lista workflows configurados em um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"}},"required":["owner","repo"],"additionalProperties":False}},
-    {"name":"github_list_workflow_runs","label":"Ver execuções de Actions","description":"Consulta as execuções recentes de GitHub Actions e seus estados.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"workflow_id":{"type":"string"},"status":{"type":"string","enum":["completed","in_progress","queued","failure","success"]}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_list_workflow_runs","label":"Ver execuções de Actions","description":"Consulta as execuções recentes de GitHub Actions e seus estados.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"workflow_id":{"type":"string"},"status":{"type":"string","enum":["completed","in_progress","queued"]}},"required":["owner","repo"],"additionalProperties":False}},
     {"name":"github_dispatch_workflow","label":"Executar GitHub Actions","description":"Inicia um workflow_dispatch no GitHub. Só use quando o usuário pedir explicitamente para executar/testar/publicar pelo GitHub Actions.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"workflow_id":{"type":"string"},"ref":{"type":"string"},"inputs":{"type":"object"}},"required":["owner","repo","workflow_id","ref"],"additionalProperties":False}},
 ]
 
@@ -487,7 +487,7 @@ def execute_connector_tool(name: str, arguments: dict, db):
             else:
                 base += "/runs"
             params = {"per_page": 20}
-            if status in {"completed", "in_progress", "queued", "failure", "success"}:
+            if status in {"completed", "in_progress", "queued"}:
                 params["status"] = status
             data = _http_json(base + "?" + urllib.parse.urlencode(params), token)
             return [{"id": x.get("id"), "name": x.get("name"), "status": x.get("status"), "conclusion": x.get("conclusion"), "branch": (x.get("head_branch") or ""), "url": x.get("html_url")} for x in (data.get("workflow_runs") or [])[:20]]
