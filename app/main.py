@@ -3,7 +3,7 @@ from pathlib import Path
 from io import BytesIO
 
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from pypdf import PdfReader
 from docx import Document
 
 from .db import Base, engine, get_db, SessionLocal
-from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction, WorkTask
+from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction, WorkTask, PushSubscription
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
@@ -69,6 +69,22 @@ class MemoryBody(BaseModel):
 class GenerateFileBody(BaseModel):
     filename: str = Field(min_length=1, max_length=120)
     description: str = Field(min_length=5, max_length=12000)
+
+
+class PushSubscriptionBody(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=2048)
+    keys: dict = Field()
+
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("app/static/sw.js", media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return FileResponse("app/static/manifest.webmanifest", media_type="application/manifest+json")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -418,7 +434,7 @@ def deny_action(action_id: int, _: None = Depends(require_auth), db: Session = D
 
 
 
-# Tarefas longas: persistidas no banco e executadas apenas enquanto a aba mantiver a sessão ativa.
+# Tarefas longas: execução no servidor; notificações Web Push opcionais no navegador.
 WORK_THREADS = {}
 WORK_THREADS_LOCK = threading.Lock()
 MAX_WORK_SECONDS = 3 * 60 * 60
@@ -523,7 +539,11 @@ def _run_work_task(task_id):
             worker_db.commit()
         logging.error("Falha na tarefa prolongada (%s): %s", type(exc).__name__, str(exc)[:500])
     finally:
+        final_task = worker_db.get(WorkTask, task_id)
+        should_notify = bool(final_task and final_task.status in {"completed", "paused"})
         worker_db.close()
+        if should_notify:
+            _send_work_notification(task_id)
         with WORK_THREADS_LOCK:
             if WORK_THREADS.get(task_id) is threading.current_thread():
                 WORK_THREADS.pop(task_id, None)
@@ -548,6 +568,104 @@ def _launch_work_thread(task_id):
         thread = threading.Thread(target=_run_work_task, args=(task_id,), daemon=True)
         WORK_THREADS[task_id] = thread
         thread.start()
+
+def _send_work_notification(task_id):
+    public_key = (os.getenv("VAPID_PUBLIC_KEY") or "").strip()
+    private_key = (os.getenv("VAPID_PRIVATE_KEY") or "").strip()
+    subject = (os.getenv("VAPID_SUBJECT") or "mailto:admin@example.com").strip()
+    if not public_key or not private_key:
+        return
+    db = SessionLocal()
+    try:
+        task = db.get(WorkTask, task_id)
+        if not task or task.status not in {"completed", "paused", "cancelled"}:
+            return
+        title = "Mikael AI: trabalho concluído" if task.status == "completed" else "Mikael AI: trabalho pausado"
+        body = (task.progress or task.goal or "A tarefa foi atualizada.")[:180]
+        payload = json.dumps({"title": title, "body": body, "url": "/"}, ensure_ascii=False)
+        subscriptions = db.scalars(select(PushSubscription)).all()
+        try:
+            from pywebpush import webpush, WebPushException
+        except ImportError:
+            logging.warning("pywebpush não está instalado; notificação não enviada.")
+            return
+        for sub in subscriptions:
+            try:
+                webpush(
+                    subscription_info={"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}},
+                    data=payload, vapid_private_key=private_key,
+                    vapid_claims={"sub": subject}, ttl=3600,
+                )
+            except WebPushException as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status in (404, 410):
+                    db.delete(sub)
+                else:
+                    logging.warning("Falha Web Push (%s)", type(exc).__name__)
+            except Exception as exc:
+                logging.warning("Falha Web Push (%s)", type(exc).__name__)
+        db.commit()
+    finally:
+        db.close()
+
+
+@app.get("/api/push/public-key")
+def push_public_key(_: None = Depends(require_auth)):
+    key = (os.getenv("VAPID_PUBLIC_KEY") or "").strip()
+    if not key:
+        raise HTTPException(503, "Notificações em segundo plano ainda não foram configuradas no servidor.")
+    return {"public_key": key}
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSubscriptionBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    endpoint = body.endpoint.strip()
+    keys = body.keys if isinstance(body.keys, dict) else {}
+    p256dh, auth = keys.get("p256dh"), keys.get("auth")
+    if not endpoint.startswith("https://") or not isinstance(p256dh, str) or not isinstance(auth, str) or not p256dh or not auth:
+        raise HTTPException(422, "Inscrição de notificação inválida.")
+    item = db.scalars(select(PushSubscription).where(PushSubscription.endpoint == endpoint)).first()
+    if item is None:
+        item = PushSubscription(endpoint=endpoint, p256dh=p256dh[:512], auth=auth[:256])
+        db.add(item)
+    else:
+        item.p256dh, item.auth = p256dh[:512], auth[:256]
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/push/subscribe")
+def push_unsubscribe(body: PushSubscriptionBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
+    item = db.scalars(select(PushSubscription).where(PushSubscription.endpoint == body.endpoint)).first()
+    if item:
+        db.delete(item)
+        db.commit()
+    return {"ok": True}
+
+
+@app.on_event("startup")
+def resume_saved_work_after_restart():
+    db = SessionLocal()
+    try:
+        tasks = db.scalars(select(WorkTask).where(WorkTask.status == "running")).all()
+        for task in tasks:
+            if task.cycle_started_at:
+                elapsed = max(0, int(time.time()) - int(task.cycle_started_at))
+                task.remaining_seconds = max(0, int(task.remaining_seconds or 0) - elapsed)
+            task.cycle_started_at = None
+            if task.remaining_seconds <= 0:
+                task.status = "completed"
+                task.progress = "Tempo definido concluído durante a reinicialização do servidor."
+            else:
+                task.progress = "Servidor reiniciado; retomando do último progresso salvo."
+        db.commit()
+        for task in tasks:
+            if task.status == "running":
+                _launch_work_thread(task.id)
+            else:
+                _send_work_notification(task.id)
+    finally:
+        db.close()
 
 @app.post("/api/work/start")
 def start_long_work(body: WorkStartBody, _: None = Depends(require_auth), db: Session = Depends(get_db)):
