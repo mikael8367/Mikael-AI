@@ -318,12 +318,22 @@ async function loadGitHubPermissions(){
     const report=await api('/api/connectors/github/permissions');
     container.innerHTML='';
     const status=document.createElement('div');
-    status.className='permission-status '+(report.scope_status==='confirmed'?'confirmed':'unknown');
-    status.textContent=report.scope_status==='confirmed'?'Escopos OAuth confirmados pelo GitHub':'O GitHub não informou o cabeçalho de escopos nesta consulta.';
+    const isInstallation=report.scope_status==='installation';
+    status.className='permission-status '+(report.scope_status==='confirmed'||isInstallation?'confirmed':'unknown');
+    status.textContent=isInstallation?'Instalação da GitHub App verificada':report.scope_status==='confirmed'?'Escopos OAuth confirmados pelo GitHub':'O GitHub não informou o cabeçalho de escopos nesta consulta.';
     container.append(status);
-    const scopeTitle=document.createElement('b');scopeTitle.textContent='Escopos OAuth concedidos';container.append(scopeTitle);
+    const scopeTitle=document.createElement('b');scopeTitle.textContent=isInstallation?'Permissões concedidas à GitHub App':'Escopos OAuth concedidos';container.append(scopeTitle);
     const scopes=document.createElement('div');scopes.className='permission-list';
-    if(report.scope_status==='confirmed'&&Array.isArray(report.oauth_scopes)&&report.oauth_scopes.length){
+    if(isInstallation){
+      const permissions=report.installation_permissions||{};
+      Object.keys(permissions).sort().forEach(permission=>{
+        const item=document.createElement('div');item.className='permission-item';
+        const name=document.createElement('b');name.textContent=permission.replace(/_/g,' ');
+        const detail=document.createElement('small');detail.textContent='Acesso: '+String(permissions[permission]);
+        item.append(name,detail);scopes.append(item);
+      });
+      const count=document.createElement('small');count.textContent='Repositórios autorizados: '+Number(report.installed_repository_count||0);scopes.append(count);
+    }else if(report.scope_status==='confirmed'&&Array.isArray(report.oauth_scopes)&&report.oauth_scopes.length){
       report.oauth_scopes.forEach(scope=>{
         const item=document.createElement('div');item.className='permission-item';
         const name=document.createElement('b');name.textContent=scope;
@@ -404,7 +414,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('approva
 $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael','deepseek','gpt4o_mini'].includes(value)){selectedModel='mikael';$('modelSelect').value='mikael';return}selectedModel=value;try{localStorage.setItem('mikael_selected_model',value)}catch{}toast('Modelo selecionado: '+$('modelSelect').selectedOptions[0].textContent)};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
-$('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};
+$('githubConnect').onclick=()=>{location.href='/api/connectors/github/install'};
 $('githubPermissionsRefresh').onclick=loadGitHubPermissions;
 $('conversationSearch').addEventListener('input',renderConversations);
 $('speakProgress').onchange=()=>{speakProgressEnabled=$('speakProgress').checked;try{localStorage.setItem('mikael_speak_progress',speakProgressEnabled?'1':'0')}catch{}if(!speakProgressEnabled&&'speechSynthesis'in window)window.speechSynthesis.cancel();toast(speakProgressEnabled?'Leitura das atualizações ativada.':'Leitura das atualizações desativada.')};
