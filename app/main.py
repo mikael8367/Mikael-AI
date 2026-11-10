@@ -515,7 +515,7 @@ def _run_work_task(task_id):
             task.remaining_seconds = max(0, int(task.remaining_seconds or 0) - elapsed)
             task.cycle_started_at = None
             result_text = result or "Ciclo concluído sem texto de resposta."
-            marker = "[CONTINUAR]"
+            marker = None
             if result_text.startswith("[TRABALHO_CONCLUIDO]"):
                 marker = "[TRABALHO_CONCLUIDO]"
                 task.status = "completed"
@@ -524,7 +524,10 @@ def _run_work_task(task_id):
                 task.status = "paused"
             elif result_text.startswith("[CONTINUAR]"):
                 marker = "[CONTINUAR]"
-            result_text = result_text[len(marker):].lstrip()
+            if marker:
+                result_text = result_text[len(marker):].lstrip()
+            else:
+                marker = "[CONTINUAR]"
             task.progress = (result_text or "Ciclo concluído.")[:1200]
             worker_db.add(Message(conversation_id=conversation_id, role="assistant", content=result_text or "Ciclo concluído sem texto de resposta."))
             if marker == "[TRABALHO_CONCLUIDO]":
