@@ -92,14 +92,14 @@
 {"instruction":"Como criar classe Java?","response":"class Pessoa { String nome; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0092"}
 {"instruction":"Como declarar método Java?","response":"int somar(int a, int b) { return a + b; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0093"}
 {"instruction":"Como declarar inteiro Java?","response":"int idade = 20;","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0094"}
-{"instruction":"Como declarar texto Java?","response":"String nome = 'Mikael';","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0095"}
+{"instruction":"Como declarar texto Java?","response":"String nome = \"Mikael\";","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0095"}
 {"instruction":"Como criar lista Java?","response":"List<String> nomes = new ArrayList<>();","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0096"}
 {"instruction":"Como percorrer lista Java?","response":"for (String nome : nomes) { System.out.println(nome); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0097"}
 {"instruction":"Como comparar strings Java?","response":"Use nome.equals(outroNome), não ==.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0098"}
 {"instruction":"O que é NullPointerException?","response":"É uma exceção ao acessar membro por uma referência null.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0099"}
 {"instruction":"Como tratar exceção Java?","response":"try { executar(); } catch (IOException e) { e.printStackTrace(); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0100"}
 {"instruction":"Como criar classe Kotlin?","response":"class Pessoa(val nome: String)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0101"}
-{"instruction":"Como declarar variável Kotlin imutável?","response":"val nome = 'Mikael'","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0102"}
+{"instruction":"Como declarar variável Kotlin imutável?","response":"val nome = \"Mikael\"","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0102"}
 {"instruction":"Como declarar variável Kotlin mutável?","response":"var contador = 0","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0103"}
 {"instruction":"Diferença entre val e var?","response":"val não recebe nova atribuição; var pode.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0104"}
 {"instruction":"O que é algoritmo?","response":"É uma sequência finita de passos para resolver um problema.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0105"}
