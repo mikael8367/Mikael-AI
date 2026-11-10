@@ -120,6 +120,51 @@ class ConnectorSecurityTests(unittest.TestCase):
         self.assertIn("excede 10.000 bytes", result["error"])
         self.assertEqual(request.call_count, 1)
 
+    def test_github_read_large_file_returns_sha_without_loading_content(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        with patch("app.connectors._http_json", return_value={
+            "type":"file","path":"assets/model.bin","sha":"blob-sha-large","size":50000,
+            "encoding":"none","content":""
+        }) as request:
+            result = execute_connector_tool("github_read_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"assets/model.bin"
+            }, FakeDB())
+        self.assertFalse(result["readable"])
+        self.assertIsNone(result["content"])
+        self.assertEqual(result["sha"], "blob-sha-large")
+        request.assert_called_once()
+
+    def test_github_binary_upload_can_replace_file_using_metadata_sha(self):
+        github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
+        class FakeQuery:
+            def filter_by(self, **kwargs):
+                return self
+            def first(self):
+                return github
+        class FakeDB:
+            def query(self, model):
+                return FakeQuery()
+        import base64
+        payload = base64.b64encode(b"new binary").decode("ascii")
+        with patch("app.connectors._http_json", side_effect=[
+            {"sha":"blob-sha-large","size":50000},
+            {"content":{"path":"assets/model.bin"},"commit":{"html_url":"https://github.com/o/r/commit/new"}}
+        ]) as request:
+            result = execute_connector_tool("github_upload_binary_file", {
+                "owner":"mikael8367","repo":"Mikael-AI","path":"assets/model.bin",
+                "content_base64":payload,"message":"Replace binary","expected_sha":"blob-sha-large"
+            }, FakeDB())
+        self.assertTrue(result["ok"])
+        self.assertEqual(request.call_args.kwargs["payload"]["sha"], "blob-sha-large")
+
     def test_github_binary_upload_creates_file_with_valid_base64(self):
         github = SimpleNamespace(enabled=True, tool_permissions="", secret=encrypt_secret("github-test-token"))
         class FakeQuery:
