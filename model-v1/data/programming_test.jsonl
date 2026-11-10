@@ -1,0 +1,10 @@
+{"instruction":"Como inverter string Python?","response":"invertida = texto[::-1]","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0001"}
+{"instruction":"Como contar ocorrências em lista?","response":"quantidade = lista.count(valor)","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0002"}
+{"instruction":"Como definir variável CSS?","response":":root { --espaco: 12px; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0003"}
+{"instruction":"Como declarar data class Kotlin?","response":"data class Usuario(val id: Int, val nome: String)","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0004"}
+{"instruction":"Como usar assert em Python?","response":"assert resultado == esperado","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0005"}
+{"instruction":"Como verificar se arquivo existe?","response":"from pathlib import Path; assert Path('dados.txt').exists()","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0006"}
+{"instruction":"Como ordenar lista JavaScript?","response":"numeros.sort((a, b) => a - b);","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0007"}
+{"instruction":"O que é polimorfismo?","response":"É permitir que tipos diferentes respondam à mesma interface.","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0008"}
+{"instruction":"O que deve conter relatório de bug?","response":"Ambiente, passos, resultado esperado, resultado real e logs.","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0009"}
+{"instruction":"Como evitar senha em código?","response":"Leia a senha de variável de ambiente ou cofre de segredos.","topic":"programacao","source":"Mikael AI authored curriculum","id":"test-0010"}
