@@ -76,7 +76,15 @@ A IA pode listar arquivos, criar arquivos de texto para download, ler arquivos e
 
 Na área Trabalho prolongado, escolha 30 minutos, 1 hora, 2 horas ou 3 horas e descreva a tarefa. O trabalho roda no servidor e a página não o pausa automaticamente quando fica oculta. Toque em **Ativar notificações** para permitir Web Push; o navegador pedirá autorização. A Mikael AI envia aviso quando começa, termina ou é pausada.
 
-Para habilitar push no Render, gere um par VAPID uma única vez com `python scripts/generate_vapid_keys.py` em um ambiente com as dependências instaladas. Cadastre `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT` no Environment do Render. A chave privada deve ficar somente no Render; nunca no GitHub ou frontend. A página precisa ser aberta por HTTPS. O navegador precisa permitir notificações.
+Para habilitar push no Render sem usar PC, abra o Google Colab pelo celular e execute:
+
+```python
+!pip -q install cryptography
+!git clone --depth 1 --branch mikael-ai-v1-core https://github.com/mikael8367/Mikael-AI.git /content/Mikael-AI
+!python /content/Mikael-AI/scripts/generate_vapid_keys.py
+```
+
+Copie a chave pública, o bloco PEM completo da chave privada e o assunto. Cadastre `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT` no Environment do Render. A chave privada deve ficar somente no Render; nunca no GitHub ou frontend. A página precisa ser aberta por HTTPS. O navegador precisa permitir notificações.
 
 **Limitação de hospedagem:** o worker atual usa uma thread no processo web e recupera tarefas após reinício quando o serviço volta. No plano gratuito do Render, o serviço pode dormir por inatividade; portanto, não há garantia de execução contínua se a plataforma suspender o processo. Para tarefas longas realmente confiáveis, use um worker persistente/serviço pago e uma fila durável. Notificações push também dependem do servidor estar ativo para enviar o evento.
 
