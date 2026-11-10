@@ -30,9 +30,10 @@ class WebSearchTests(unittest.TestCase):
             {"url_citation": {"title": "URL inválida", "url": "javascript:alert(1)"}},
         ])
         client = Mock()
-        client.chat.completions.create.return_value = SimpleNamespace(
-            choices=[SimpleNamespace(message=message)]
-        )
+        client.chat.completions.create.side_effect = [
+            SimpleNamespace(choices=[SimpleNamespace(message=FakeMessage("ALLOW", []))]),
+            SimpleNamespace(choices=[SimpleNamespace(message=message)]),
+        ]
         openai_class.return_value = client
 
         result = llm.search_web("documentação Kotlin")
@@ -43,13 +44,18 @@ class WebSearchTests(unittest.TestCase):
             "title": "Documentação",
             "url": "https://docs.example.org/page",
         }])
-        request = client.chat.completions.create.call_args.kwargs
-        self.assertEqual(len(request["messages"]), 2)
-        self.assertEqual(request["messages"][-1], {
+        self.assertEqual(client.chat.completions.create.call_count, 2)
+        safety_request = client.chat.completions.create.call_args_list[0].kwargs
+        search_request = client.chat.completions.create.call_args_list[1].kwargs
+        self.assertEqual(safety_request["messages"][-1], {
             "role": "user",
             "content": "documentação Kotlin",
         })
-        self.assertEqual(request["tools"][0]["type"], "openrouter:web_search")
+        self.assertEqual(search_request["messages"][-1], {
+            "role": "user",
+            "content": "documentação Kotlin",
+        })
+        self.assertEqual(search_request["tools"][0]["type"], "openrouter:web_search")
 
     @patch.dict(os.environ, {
         "LLM_API_KEY": "test-key",
@@ -59,13 +65,34 @@ class WebSearchTests(unittest.TestCase):
     @patch("app.llm.OpenAI")
     def test_search_refuses_to_claim_results_without_citations(self, openai_class):
         client = Mock()
-        client.chat.completions.create.return_value = SimpleNamespace(
-            choices=[SimpleNamespace(message=FakeMessage("Resposta sem fontes.", []))]
-        )
+        client.chat.completions.create.side_effect = [
+            SimpleNamespace(choices=[SimpleNamespace(message=FakeMessage("ALLOW", []))]),
+            SimpleNamespace(choices=[SimpleNamespace(message=FakeMessage("Resposta sem fontes.", []))]),
+        ]
         openai_class.return_value = client
 
         with self.assertRaisesRegex(RuntimeError, "fontes verificáveis"):
             llm.search_web("consulta de teste")
+
+    @patch.dict(os.environ, {
+        "LLM_API_KEY": "test-key",
+        "LLM_BASE_URL": "https://openrouter.ai/api/v1",
+        "LLM_WEB_SEARCH_ENABLED": "true",
+    }, clear=False)
+    @patch("app.llm.OpenAI")
+    def test_blocked_query_never_reaches_web_search_tool(self, openai_class):
+        client = Mock()
+        client.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=FakeMessage("BLOCK", []))]
+        )
+        openai_class.return_value = client
+
+        with self.assertRaises(PermissionError):
+            llm.search_web("consulta não permitida")
+
+        self.assertEqual(client.chat.completions.create.call_count, 1)
+        request = client.chat.completions.create.call_args.kwargs
+        self.assertNotIn("tools", request)
 
     def test_search_rejects_empty_or_oversized_queries(self):
         with self.assertRaises(ValueError):
