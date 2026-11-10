@@ -1,0 +1,53 @@
+name: Mikael AI V1 Programming Training
+
+on:
+  push:
+    branches: [mikael-ai-v1-core]
+    paths:
+      - "model-v1/sft_train.py"
+      - "model-v1/mikael_ai_v1.py"
+      - "model-v1/data/programming_*.jsonl"
+      - "model-v1/tests/**"
+      - ".github/workflows/mikael-ai-v1-programming-train.yml"
+  workflow_dispatch:
+
+jobs:
+  train-programming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: model-v1
+    env:
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mikael-ai-v1-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: model-v1/requirements.txt
+      - name: Install CPU training dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch pytest requests beautifulsoup4
+      - name: Run full tests before training
+        run: pytest -q
+      - name: Compile training code
+        run: python -m py_compile mikael_ai_v1.py sft_train.py dataset_tools.py
+      - name: Train programming model
+        run: |
+          python sft_train.py             --train data/programming_train.jsonl             --val data/programming_val.jsonl             --test data/programming_test.jsonl             --epochs 30             --batch-size 8             --lr 0.0001             --patience 7             --output checkpoints/programming
+      - name: Upload trained checkpoint and report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikael-ai-v1-programming-checkpoint
+          path: |
+            model-v1/checkpoints/programming/mikael-ai-v1-sft.pt
+            model-v1/checkpoints/programming/training_report.json
+          if-no-files-found: error
+          retention-days: 30
