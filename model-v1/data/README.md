@@ -1,11 +1,11 @@
 # Dados de treinamento
 
 ## Corpus de programação da Mikael AI V1
-- programming_train.jsonl: 128 exemplos autorais em português.
-- programming_val.jsonl: 15 exemplos para escolher o melhor checkpoint.
-- programming_test.jsonl: 10 exemplos isolados para avaliação final.
-- Os tópicos incluem Python, JavaScript, HTML, CSS, Java, Kotlin, algoritmos, estruturas de dados, Git, APIs, segurança e depuração.
-- O corpus inicial é didático e pequeno; não representa conhecimento profissional nem substitui milhares de exemplos revisados e benchmarks.
+- programming_train.jsonl: 384 exemplos autorais em português.
+- programming_val.jsonl: 25 exemplos para escolher o melhor checkpoint.
+- programming_test.jsonl: 18 exemplos isolados para avaliação final.
+- O conjunto inclui Java (80), C++ (83), Python, JavaScript, Kotlin, C#, SQL, Git, HTML, CSS, algoritmos, estruturas de dados, APIs, segurança, testes e depuração.
+- O corpus inicial é didático e pequeno; não representa conhecimento profissional nem substitui milhares de exemplos revisados, exercícios completos, testes executáveis e benchmarks.
 
 ## Regras para novos dados
 - Use textos e exemplos que você criou ou tem autorização para usar.
