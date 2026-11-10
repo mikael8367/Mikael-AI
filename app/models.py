@@ -78,3 +78,12 @@ class WorkTask(Base):
     result: Mapped[str] = mapped_column(Text, default="")
     cycle_started_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    endpoint: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    p256dh: Mapped[str] = mapped_column(String(512))
+    auth: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
