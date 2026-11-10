@@ -108,3 +108,10 @@ uvicorn app.main:app --reload
 
 ## Auditoria técnica
 A versão atual requer validação contínua em ambiente real. Antes de produção, adicione rate limiting, proteção CSRF adequada, política de retenção/remoção de arquivos e logs estruturados. Nunca considere um deploy concluído sem testar login, chat, banco, upload e análise.
+
+
+## Android query-only web search
+
+The authenticated `POST /api/search` endpoint accepts only `{"query":"..."}` (2–500 characters). It does not read or persist conversation history, memory, uploads, or code. It sends that explicit query to the configured OpenRouter model for a teen-safety check and, only if allowed, to the configured OpenRouter web-search tool (Exa by default). It returns a short summary and validated HTTP(S) citations.
+
+The Android client must request consent for each search and disclose that the query is processed by this Render service and OpenRouter/Exa. Provider usage can consume credits or account limits. API credentials remain in Render environment variables and must never be embedded in the APK.
