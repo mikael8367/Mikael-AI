@@ -41,7 +41,16 @@ jobs:
         run: python -m py_compile mikael_ai_v1.py sft_train.py dataset_tools.py
       - name: Train programming model
         run: |
-          python sft_train.py             --train data/programming_train.jsonl             --val data/programming_val.jsonl             --test data/programming_test.jsonl             --epochs 30             --batch-size 8             --lr 0.0001             --patience 7             --output checkpoints/programming
+          python sft_train.py \
+            --train data/programming_train.jsonl \
+            --val data/programming_val.jsonl \
+            --test data/programming_test.jsonl \
+            --epochs 100 \
+            --batch-size 8 \
+            --lr 0.00005 \
+            --patience 15 \
+            --min-delta 0.00001 \
+            --output checkpoints/programming
       - name: Upload trained checkpoint and report
         uses: actions/upload-artifact@v4
         with:
