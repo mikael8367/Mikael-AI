@@ -386,7 +386,7 @@ async function enableWorkNotifications(){
       });
     }
     await api('/api/push/subscribe',{method:'POST',body:JSON.stringify(subscription.toJSON())});
-    $('notificationStatus').textContent='Notificações ativadas. Você receberá avisos quando o trabalho terminar ou for pausado.';
+    $('notificationStatus').textContent='Notificações ativadas. Você receberá avisos quando o trabalho começar, terminar ou for pausado.';
     button.textContent='Notificações ativadas';
     toast('Notificações ativadas com sucesso.');
   }catch(error){
