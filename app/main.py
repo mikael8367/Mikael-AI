@@ -263,11 +263,15 @@ def github_permissions(_: None = Depends(require_auth), db: Session = Depends(ge
 @app.get("/api/connectors/github/install")
 def github_app_install(_: None = Depends(require_auth)):
     from itsdangerous import URLSafeTimedSerializer
-    slug = (os.getenv("GITHUB_APP_SLUG") or "mikael-ai-assistant").strip()
-    if not re.fullmatch(r"[a-zA-Z0-9-]{1,100}", slug):
-        raise HTTPException(503, "GITHUB_APP_SLUG inválido no Render.")
     if not (os.getenv("GITHUB_APP_ID") or "").strip() or not (os.getenv("GITHUB_PRIVATE_KEY") or "").strip():
         raise HTTPException(503, "Configure GITHUB_APP_ID e GITHUB_PRIVATE_KEY no Render.")
+    try:
+        app_info = _http_json("https://api.github.com/app", github_app_jwt())
+        slug = str(app_info.get("slug") or "")
+    except Exception:
+        raise HTTPException(503, "Não foi possível identificar a GitHub App. Confira App ID e Private Key no Render.")
+    if not re.fullmatch(r"[a-zA-Z0-9-]{1,100}", slug):
+        raise HTTPException(503, "O GitHub não retornou um identificador válido para a App.")
     state = URLSafeTimedSerializer(os.getenv("APP_SECRET"), salt="mikael-github-app-install").dumps({"nonce": os.urandom(24).hex()})
     url = "https://github.com/apps/%s/installations/new?state=%s" % (slug, urllib.parse.quote(state, safe=""))
     response = RedirectResponse(url, status_code=302)
