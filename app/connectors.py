@@ -215,7 +215,7 @@ def _safe_schema(schema):
 
 GITHUB_TOOL_SPECS = [
     {"name":"github_list_repositories","label":"Listar repositórios","description":"Lista repositórios acessíveis pela conta GitHub conectada.","parameters":{"type":"object","properties":{"visibility":{"type":"string","enum":["all","public","private"]}},"additionalProperties":False}},
-    {"name":"github_read_file","label":"Ler arquivos","description":"Lê um arquivo de texto de um repositório GitHub. Informe owner, repo e path.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"ref":{"type":"string"}},"required":["owner","repo","path"],"additionalProperties":False}},
+    {"name":"github_read_file","label":"Ler arquivos","description":"Lê um arquivo de texto de um repositório GitHub; para arquivos grandes, retorna metadados e SHA sem carregar o conteúdo. Informe owner, repo e path.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"ref":{"type":"string"}},"required":["owner","repo","path"],"additionalProperties":False}},
     {"name":"github_list_issues","label":"Listar issues","description":"Lista issues abertas de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"state":{"type":"string","enum":["open","closed","all"]}},"required":["owner","repo"],"additionalProperties":False}},
     {"name":"github_search_code","label":"Pesquisar código","description":"Pesquisa arquivos e trechos de código nos repositórios que a conta pode acessar. Informe uma consulta GitHub Code Search.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"],"additionalProperties":False}},
     {"name":"github_list_branches","label":"Listar branches","description":"Lista branches de um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"}},"required":["owner","repo"],"additionalProperties":False}},
@@ -341,12 +341,13 @@ def execute_connector_tool(name: str, arguments: dict, db):
             query = urllib.parse.urlencode({"ref": ref}) if isinstance(ref, str) and ref else ""
             url = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
             data = _http_json(url + (("?" + query) if query else ""), token)
+            size = int(data.get("size") or 0)
+            if size > 10000:
+                return {"path": data.get("path"), "sha": data.get("sha"), "size": size, "content": None, "readable": False, "message": "Arquivo grande: SHA disponível para atualização binária, conteúdo não carregado."}
             if data.get("encoding") != "base64" or not data.get("content"):
                 return {"error": "O caminho não corresponde a um arquivo de texto simples."}
-            if int(data.get("size") or 0) > 10000:
-                return {"error": "Este arquivo excede 10.000 bytes e não pode ser editado com segurança por esta ferramenta."}
             raw = base64.b64decode(data["content"])
-            return {"path": data.get("path"), "sha": data.get("sha"), "content": raw.decode("utf-8", errors="replace")}
+            return {"path": data.get("path"), "sha": data.get("sha"), "size": size, "content": raw.decode("utf-8", errors="replace"), "readable": True}
         if name == "github_search_code":
             query = arguments.get("query")
             if not isinstance(query, str) or not query.strip() or len(query) > 300:
@@ -435,14 +436,14 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 return {"error": "Owner, repositório ou caminho inválido."}
             if path.startswith("/") or any(part in {"", ".", ".."} for part in path.split("/")):
                 return {"error": "Caminho de arquivo inválido."}
-            if not isinstance(encoded, str) or len(encoded) > 7_000_000 or not isinstance(message, str) or not message.strip():
-                return {"error": "Conteúdo Base64 ou mensagem de commit inválidos."}
+            if not isinstance(encoded, str) or len(encoded) > 1_000_000 or not isinstance(message, str) or not message.strip():
+                return {"error": "Conteúdo Base64 ou mensagem de commit inválidos; limite de upload binário é 700 KB."}
             try:
                 raw = base64.b64decode(encoded, validate=True)
             except Exception:
                 return {"error": "O conteúdo enviado não é Base64 válido."}
-            if not raw or len(raw) > 5_000_000:
-                return {"error": "O arquivo precisa ter entre 1 byte e 5 MB."}
+            if not raw or len(raw) > 700_000:
+                return {"error": "O arquivo precisa ter entre 1 byte e 700 KB."}
             branch = arguments.get("branch")
             query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
             base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
