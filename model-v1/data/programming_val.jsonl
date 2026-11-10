@@ -1,0 +1,15 @@
+{"instruction":"Como testar se lista está vazia?","response":"if not lista: print('vazia')","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0001"}
+{"instruction":"Como retornar o dobro em Python?","response":"def dobro(n): return n * 2","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0002"}
+{"instruction":"Como capturar erro de valor?","response":"try: n = int(texto)\nexcept ValueError: print('Inválido')","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0003"}
+{"instruction":"Como percorrer dicionário?","response":"for chave, valor in dados.items(): print(chave, valor)","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0004"}
+{"instruction":"Como declarar constante JavaScript?","response":"const limite = 100;","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0005"}
+{"instruction":"Como remover elemento do DOM?","response":"document.querySelector('#aviso')?.remove();","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0006"}
+{"instruction":"Como criar media query CSS?","response":"@media (max-width: 600px) { .menu { display: block; } }","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0007"}
+{"instruction":"Como declarar classe Java com construtor?","response":"class Pessoa { Pessoa(String nome) {} }","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0008"}
+{"instruction":"Como verificar nulo em Kotlin?","response":"if (nome == null) println('vazio')","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0009"}
+{"instruction":"Qual a primeira etapa ao corrigir bug?","response":"Reproduza o problema e registre os passos e a mensagem de erro.","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0010"}
+{"instruction":"Como criar função JS assíncrona?","response":"async function carregar() { return await fetch(url); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0011"}
+{"instruction":"Como impedir envio padrão de formulário?","response":"form.addEventListener('submit', e => e.preventDefault());","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0012"}
+{"instruction":"Como declarar array Java?","response":"int[] numeros = {1, 2, 3};","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0013"}
+{"instruction":"O que é encapsulamento?","response":"É controlar o acesso ao estado interno por uma interface definida.","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0014"}
+{"instruction":"O que é recursão infinita?","response":"É recursão sem condição de parada alcançável, podendo estourar a pilha.","topic":"programacao","source":"Mikael AI authored curriculum","id":"val-0015"}
