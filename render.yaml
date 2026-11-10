@@ -33,6 +33,12 @@ services:
         value: 5
       - key: MAX_UPLOAD_MB
         value: 8
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_APP_SLUG
+        value: mikael-ai-assistant
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET
