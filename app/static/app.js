@@ -318,12 +318,22 @@ async function loadGitHubPermissions(){
     const report=await api('/api/connectors/github/permissions');
     container.innerHTML='';
     const status=document.createElement('div');
-    status.className='permission-status '+(report.scope_status==='confirmed'?'confirmed':'unknown');
-    status.textContent=report.scope_status==='confirmed'?'Escopos OAuth confirmados pelo GitHub':'O GitHub não informou o cabeçalho de escopos nesta consulta.';
+    const isInstallation=report.scope_status==='installation';
+    status.className='permission-status '+(report.scope_status==='confirmed'||isInstallation?'confirmed':'unknown');
+    status.textContent=isInstallation?'Instalação da GitHub App verificada':report.scope_status==='confirmed'?'Escopos OAuth confirmados pelo GitHub':'O GitHub não informou o cabeçalho de escopos nesta consulta.';
     container.append(status);
-    const scopeTitle=document.createElement('b');scopeTitle.textContent='Escopos OAuth concedidos';container.append(scopeTitle);
+    const scopeTitle=document.createElement('b');scopeTitle.textContent=isInstallation?'Permissões concedidas à GitHub App':'Escopos OAuth concedidos';container.append(scopeTitle);
     const scopes=document.createElement('div');scopes.className='permission-list';
-    if(report.scope_status==='confirmed'&&Array.isArray(report.oauth_scopes)&&report.oauth_scopes.length){
+    if(isInstallation){
+      const permissions=report.installation_permissions||{};
+      Object.keys(permissions).sort().forEach(permission=>{
+        const item=document.createElement('div');item.className='permission-item';
+        const name=document.createElement('b');name.textContent=permission.replace(/_/g,' ');
+        const detail=document.createElement('small');detail.textContent='Acesso: '+String(permissions[permission]);
+        item.append(name,detail);scopes.append(item);
+      });
+      const count=document.createElement('small');count.textContent='Repositórios autorizados: '+Number(report.installed_repository_count||0);scopes.append(count);
+    }else if(report.scope_status==='confirmed'&&Array.isArray(report.oauth_scopes)&&report.oauth_scopes.length){
       report.oauth_scopes.forEach(scope=>{
         const item=document.createElement('div');item.className='permission-item';
         const name=document.createElement('b');name.textContent=scope;
