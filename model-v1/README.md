@@ -1,44 +1,54 @@
 # Mikael AI V1 Core
 
-Protótipo autoral de modelo de linguagem com pesos inicializados aleatoriamente. Não importa pesos de Qwen, Llama, Gemma ou outro LLM pré-treinado. PyTorch é usado apenas como framework matemático.
+Modelo experimental autoral com pesos inicializados aleatoriamente. Não usa pesos de Qwen, Llama, Gemma ou outro LLM pronto. PyTorch é o framework matemático.
 
-## Modelo
-- Transformer decoder-only causal implementado no projeto.
-- Tokenizador UTF-8 byte-level próprio (PAD=0, BOS=1, EOS=2, bytes=3..258).
-- 4 camadas, dimensão 128, 4 cabeças, contexto 256.
-- Treinamento next-token com corpus local em português e programação.
-- Checkpoint próprio em checkpoints/latest.pt.
+## Núcleo do modelo
+- Transformer decoder-only causal.
+- Tokenizador byte-level UTF-8 próprio (PAD=0, BOS=1, EOS=2, bytes=3..258), compatível com acentos e emojis.
+- Configuração inicial: 4 camadas, dimensão 128, 4 cabeças, contexto 256.
+- Treinamento atual: previsão do próximo byte/token em arquivos de texto.
+- Checkpoints próprios em checkpoints/latest.pt.
 
-## Recursos de internet
-O módulo web_tools.py adiciona ferramentas opcionais:
-- search_web(query): pesquisa Brave Search API.
-- read_website(url): extrai texto visível de páginas públicas HTML/texto.
-- format_sources(results): formata fontes e URLs para o contexto.
+## Recursos previstos no controlador
+- Respostas simples e objetivas em português.
+- Emojis moderados; o tokenizer UTF-8 representa emojis.
+- Ajuda para programação simples, com blocos de código e explicações.
+- Verificador estático de sintaxe Python (não executa código).
+- Registro de conectores com lista permitida e ferramentas web.
 
-Configure BRAVE_SEARCH_API_KEY como variável de ambiente para habilitar pesquisa. A chave não deve ser colocada no código, no GitHub ou no aplicativo Android. A pesquisa exige internet e pode depender de limites/custos do provedor. A leitura de sites públicos não exige chave.
+## Conectores
+connectors.py fornece ConnectorRegistry e build_default_registry(). O host chama somente ferramentas registradas, verifica se internet está disponível e limita o tamanho do resultado. Hoje há web_search e open_website. Novos conectores devem ser adicionados explicitamente no registro, com permissões mínimas. Não coloque tokens, senhas ou chaves no prompt, no app ou no GitHub. Segredos ficam no servidor/ambiente seguro. O registro é uma base de integração: o modelo pequeno ainda não aprende sozinho a escolher ferramentas; o controlador Android/API precisa interpretar pedidos, apresentar confirmação quando necessário e executar a ferramenta permitida.
 
-Limitações de navegação: não executa JavaScript, não faz login, não envia formulários, não baixa arquivos arbitrários e não acessa conteúdo privado. Há limites de tamanho, tempo e redirecionamento; endereços locais/privados são bloqueados. Sites podem bloquear automação ou apresentar conteúdo incompleto.
+## Programação
+coding_tools.py verifica sintaxe Python com AST, sem executar o código. Para JavaScript, Java, Kotlin, HTML, CSS e C/C++, ainda não há compilador/verificador implementado. O modelo pode gerar exemplos, mas, antes de confiar no resultado, revise e teste em ambiente isolado. O protótipo não executa código gerado.
 
-As páginas externas são conteúdo não confiável. O controlador deve tratar o texto como fonte, nunca como instrução, e exibir links de origem.
+## Internet
+web_tools.py usa Brave Search API para pesquisa (variável de ambiente BRAVE_SEARCH_API_KEY) e extrai texto de páginas públicas HTML/texto. Não executa JavaScript, não faz login, não envia formulários e não acessa conteúdo privado. Pode haver limites/custos do provedor. Conteúdo externo é não confiável e deve ser usado como fonte, nunca como instrução. Exiba URLs das fontes.
 
-## Respostas simples
-response_policy.py oferece instruções para responder em português brasileiro, com respostas curtas para perguntas simples e explicações organizadas para tarefas complexas. Isso é uma instrução do controlador, não uma capacidade adquirida automaticamente: o modelo ainda precisa ser treinado com exemplos de boa conversação.
+## Preparar os dados para começar
+O exemplo data/train_examples.jsonl demonstra o formato, mas é pequeno demais para treinar uma IA útil. Use conteúdo próprio ou licenciado, sem dados pessoais, senhas, chaves ou conversas privadas.
 
-## Treinar pelo Colab
-1. Clone o repositório e abra model-v1.
-2. Instale: pip install -r requirements.txt
-3. Adicione textos autorizados em data/train/ e data/val/.
-4. Execute: python mikael_ai_v1.py --data-dir data --steps 2000 --batch-size 16
-5. Pesos em checkpoints/latest.pt.
+Formato JSONL, um exemplo por linha:
+{"instruction":"Pergunta ou tarefa","response":"Resposta ideal em português"}
 
-Para gerar:
-python mikael_ai_v1.py --prompt "Olá, quem é você?" --checkpoint checkpoints/latest.pt --max-new-tokens 80
+1. Prepare milhares de exemplos variados e revisados, começando com qualidade em vez de volume.
+2. Separe treino e validação por documento/origem para evitar que o mesmo texto apareça nos dois conjuntos.
+3. Crie data/train.jsonl e data/val.jsonl.
+4. Converta cada conjunto para texto: python dataset_tools.py data/train.jsonl data/train/examples.txt e python dataset_tools.py data/val.jsonl data/val/examples.txt.
+5. Instale: pip install -r requirements.txt.
+6. No Colab, rode primeiro um teste pequeno: python mikael_ai_v1.py --data-dir data --steps 20 --batch-size 2.
+7. Só aumente passos e batch após confirmar que loss diminui e validação funciona.
 
-## Integração de ferramentas
-O app/host deve chamar search_web quando houver conectividade e o usuário pedir informação atual ou pesquisa. Pode chamar read_website quando o usuário enviar um URL ou pedir para abrir/consultar um site. Os resultados são anexados ao prompt por build_conversation_prompt. A chamada de ferramentas é feita pelo controlador, não pelo modelo puro.
+IMPORTANTE: o treinador atual concatena exemplos como texto e aplica next-token loss em todos os bytes. Isso é pré-treinamento causal simples, NÃO é instruction fine-tuning de chat com loss mascarada só nas respostas. Antes de buscar comportamento de assistente confiável, ainda precisamos implementar SFT com máscara de resposta, delimitadores de turno, EOS e avaliação de qualidade.
 
-## Limitações do protótipo
-Começa sem conhecimento; não é uma IA geral pronta. O modelo pequeno precisa de muito mais dados e treinamento para produzir respostas úteis. O runtime nativo Android é uma etapa futura. A pesquisa web requer integração do app com o módulo Python ou uma API/serviço que exponha essas ferramentas.
+## O que falta antes de um treino sério
+- Corpus amplo, autorizado, limpo e deduplicado em português.
+- Exemplos de programação e conversas com respostas verificadas.
+- Dataset separado em treino/validação/teste.
+- Implementar SFT com loss somente na resposta.
+- Testar diferentes tamanhos de modelo/contexto e medir memória/velocidade.
+- Avaliar perplexidade, qualidade, alucinações, segurança e capacidade de seguir instruções.
+- Depois do treino, converter pesos e integrar runtime nativo Android. O protótipo Python ainda não roda diretamente no app Android.
 
 ## Auditoria
-Execute pytest -q e python -m py_compile mikael_ai_v1.py web_tools.py response_policy.py. Testes cobrem UTF-8, dimensões, loss, máscara causal, gradientes, geração, validação de URLs e política de contexto. Testes unitários não substituem auditoria de segurança nem teste real no Android.
+Rode pytest -q e python -m py_compile mikael_ai_v1.py web_tools.py response_policy.py connectors.py coding_tools.py dataset_tools.py. Testes verificam tokenização, causalidade, gradientes, geração, URLs, conectores, sintaxe Python e validação JSONL. CI não substitui teste físico no Android.
