@@ -4,8 +4,6 @@ self.addEventListener('push', event => {
   const title = String(data.title || 'Mikael AI');
   const options = {
     body: String(data.body || 'Seu trabalho foi atualizado.'),
-    icon: '/static/icon-192.png',
-    badge: '/static/icon-192.png',
     data: { url: String(data.url || '/') },
     tag: 'mikael-ai-work',
     renotify: true
