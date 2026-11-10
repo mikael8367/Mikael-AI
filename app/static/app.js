@@ -404,7 +404,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('approva
 $('modelSelect').onchange=()=>{const value=$('modelSelect').value;if(!['mikael','deepseek','gpt4o_mini'].includes(value)){selectedModel='mikael';$('modelSelect').value='mikael';return}selectedModel=value;try{localStorage.setItem('mikael_selected_model',value)}catch{}toast('Modelo selecionado: '+$('modelSelect').selectedOptions[0].textContent)};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});boot()}catch(e){$('loginError').textContent=e.message}};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
-$('githubConnect').onclick=()=>{location.href='/api/connectors/github/start'};
+$('githubConnect').onclick=()=>{location.href='/api/connectors/github/install'};
 $('githubPermissionsRefresh').onclick=loadGitHubPermissions;
 $('conversationSearch').addEventListener('input',renderConversations);
 $('speakProgress').onchange=()=>{speakProgressEnabled=$('speakProgress').checked;try{localStorage.setItem('mikael_speak_progress',speakProgressEnabled?'1':'0')}catch{}if(!speakProgressEnabled&&'speechSynthesis'in window)window.speechSynthesis.cancel();toast(speakProgressEnabled?'Leitura das atualizações ativada.':'Leitura das atualizações desativada.')};
