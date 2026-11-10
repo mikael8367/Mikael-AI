@@ -226,6 +226,10 @@ GITHUB_TOOL_SPECS = [
     {"name":"github_create_issue_comment","label":"Comentar em issue ou PR","description":"Publica um comentário em uma issue ou pull request. Use somente quando o usuário pedir explicitamente.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"number":{"type":"integer"},"body":{"type":"string"}},"required":["owner","repo","number","body"],"additionalProperties":False}},
     {"name":"github_create_pull_request","label":"Criar pull request","description":"Cria um pull request entre branches existentes.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"title":{"type":"string"},"head":{"type":"string"},"base":{"type":"string"},"body":{"type":"string"}},"required":["owner","repo","title","head","base"],"additionalProperties":False}},
     {"name":"github_delete_file","label":"Solicitar exclusão de arquivo","description":"Cria uma solicitação pendente. O arquivo só será apagado depois da aprovação explícita na interface.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"}},"required":["owner","repo","path","message"],"additionalProperties":False}},
+    {"name":"github_upload_binary_file","label":"Enviar arquivo binário","description":"Envia imagem, ZIP ou outro arquivo binário ao repositório usando conteúdo Base64. Para atualizar, leia o arquivo e informe expected_sha. Não apaga arquivos.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"path":{"type":"string"},"content_base64":{"type":"string"},"message":{"type":"string"},"branch":{"type":"string"},"expected_sha":{"type":"string"}},"required":["owner","repo","path","content_base64","message"],"additionalProperties":False}},
+    {"name":"github_list_workflows","label":"Listar GitHub Actions","description":"Lista workflows configurados em um repositório.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_list_workflow_runs","label":"Ver execuções de Actions","description":"Consulta as execuções recentes de GitHub Actions e seus estados.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"workflow_id":{"type":"string"},"status":{"type":"string","enum":["completed","in_progress","queued","failure","success"]}},"required":["owner","repo"],"additionalProperties":False}},
+    {"name":"github_dispatch_workflow","label":"Executar GitHub Actions","description":"Inicia um workflow_dispatch no GitHub. Só use quando o usuário pedir explicitamente para executar/testar/publicar pelo GitHub Actions.","parameters":{"type":"object","properties":{"owner":{"type":"string"},"repo":{"type":"string"},"workflow_id":{"type":"string"},"ref":{"type":"string"},"inputs":{"type":"object"}},"required":["owner","repo","workflow_id","ref"],"additionalProperties":False}},
 ]
 
 def _connector_permissions(connector):
@@ -424,6 +428,81 @@ def execute_connector_tool(name: str, arguments: dict, db):
                 payload["branch"] = branch
             result = _http_json(base, token, method="PUT", payload=payload)
             return {"ok": True, "path": result.get("content", {}).get("path", path), "commit": result.get("commit", {}).get("html_url")}
+        if name == "github_upload_binary_file":
+            owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
+            encoded, message = arguments.get("content_base64"), arguments.get("message")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, path)):
+                return {"error": "Owner, repositório ou caminho inválido."}
+            if path.startswith("/") or any(part in {"", ".", ".."} for part in path.split("/")):
+                return {"error": "Caminho de arquivo inválido."}
+            if not isinstance(encoded, str) or len(encoded) > 7_000_000 or not isinstance(message, str) or not message.strip():
+                return {"error": "Conteúdo Base64 ou mensagem de commit inválidos."}
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+            except Exception:
+                return {"error": "O conteúdo enviado não é Base64 válido."}
+            if not raw or len(raw) > 5_000_000:
+                return {"error": "O arquivo precisa ter entre 1 byte e 5 MB."}
+            branch = arguments.get("branch")
+            query = urllib.parse.urlencode({"ref": branch}) if isinstance(branch, str) and branch else ""
+            base = "https://api.github.com/repos/%s/%s/contents/%s" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(path, safe="/"))
+            current_data = None
+            try:
+                current_data = _http_json(base + (("?" + query) if query else ""), token)
+            except RuntimeError as exc:
+                if "HTTP 404" not in str(exc):
+                    raise
+            expected_sha = arguments.get("expected_sha")
+            if current_data:
+                if not isinstance(expected_sha, str) or expected_sha != current_data.get("sha"):
+                    return {"error": "Antes de substituir o arquivo, leia-o e informe o SHA atual em expected_sha."}
+                current = current_data.get("sha")
+            else:
+                if expected_sha:
+                    return {"error": "O arquivo não existe mais; consulte o caminho novamente."}
+                current = None
+            payload = {"message": message[:200], "content": base64.b64encode(raw).decode("ascii")}
+            if current:
+                payload["sha"] = current
+            if isinstance(branch, str) and branch:
+                payload["branch"] = branch
+            result = _http_json(base, token, method="PUT", payload=payload)
+            return {"ok": True, "path": result.get("content", {}).get("path", path), "size": len(raw), "commit": result.get("commit", {}).get("html_url")}
+        if name == "github_list_workflows":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 100 for x in (owner, repo)):
+                return {"error": "Owner ou repositório inválido."}
+            url = "https://api.github.com/repos/%s/%s/actions/workflows?per_page=100" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""))
+            data = _http_json(url, token)
+            return [{"id": x.get("id"), "name": x.get("name"), "path": x.get("path"), "state": x.get("state"), "url": x.get("html_url")} for x in (data.get("workflows") or [])[:100]]
+        if name == "github_list_workflow_runs":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            if not all(isinstance(x, str) and x.strip() and len(x) < 100 for x in (owner, repo)):
+                return {"error": "Owner ou repositório inválido."}
+            workflow_id = arguments.get("workflow_id")
+            status = arguments.get("status")
+            base = "https://api.github.com/repos/%s/%s/actions" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""))
+            if isinstance(workflow_id, str) and workflow_id.strip():
+                base += "/workflows/" + urllib.parse.quote(workflow_id, safe="") + "/runs"
+            else:
+                base += "/runs"
+            params = {"per_page": 20}
+            if status in {"completed", "in_progress", "queued", "failure", "success"}:
+                params["status"] = status
+            data = _http_json(base + "?" + urllib.parse.urlencode(params), token)
+            return [{"id": x.get("id"), "name": x.get("name"), "status": x.get("status"), "conclusion": x.get("conclusion"), "branch": (x.get("head_branch") or ""), "url": x.get("html_url")} for x in (data.get("workflow_runs") or [])[:20]]
+        if name == "github_dispatch_workflow":
+            owner, repo = arguments.get("owner"), arguments.get("repo")
+            workflow_id, ref = arguments.get("workflow_id"), arguments.get("ref")
+            inputs = arguments.get("inputs") or {}
+            if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, workflow_id, ref)):
+                return {"error": "Owner, repositório, workflow ou ref inválidos."}
+            if not isinstance(inputs, dict) or len(inputs) > 20:
+                return {"error": "Inputs do workflow inválidos."}
+            payload = {"ref": ref, "inputs": inputs}
+            url = "https://api.github.com/repos/%s/%s/actions/workflows/%s/dispatches" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(workflow_id, safe=""))
+            _http_json(url, token, method="POST", payload=payload)
+            return {"ok": True, "message": "Workflow dispatch enviado ao GitHub. Consulte as execuções para confirmar início e resultado."}
         if name == "github_create_issue":
             owner, repo, title = arguments.get("owner"), arguments.get("repo"), arguments.get("title")
             if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, title)):
