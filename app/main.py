@@ -483,7 +483,10 @@ def _run_work_task(task_id):
                     "preserve o projeto, valide cada alteração e registre progresso factual. Não repita etapas já concluídas. "
                     "Não afirme que algo foi testado sem testar. Não faça exclusões sem aprovação explícita. "
                     "Se não houver uma próxima ação segura ou faltar acesso, explique o bloqueio e não invente trabalho. "
-                    "Ao final de cada ciclo, escreva um relatório curto do que realmente fez e a próxima etapa."
+                    "Ao final de cada ciclo, escreva um relatório curto do que realmente fez e a próxima etapa.\n"
+                    "Se o objetivo inteiro estiver concluído, comece exatamente com [TRABALHO_CONCLUIDO].\n"
+                    "Se houver bloqueio real sem próxima ação segura ou acesso, comece exatamente com [TRABALHO_BLOQUEADO].\n"
+                    "Se ainda houver uma próxima etapa útil, comece com [CONTINUAR]. Não use concluído apenas por terminar uma etapa."
                 )},
                 *[{"role":m.role,"content":m.content} for m in recent],
                 {"role":"user","content":(
@@ -511,15 +514,32 @@ def _run_work_task(task_id):
             elapsed = max(1, int(time.time()) - int(task.cycle_started_at or started))
             task.remaining_seconds = max(0, int(task.remaining_seconds or 0) - elapsed)
             task.cycle_started_at = None
-            task.progress = (result or "Ciclo concluído.")[:1200]
-            worker_db.add(Message(conversation_id=conversation_id, role="assistant", content=result or "Ciclo concluído sem texto de resposta."))
-            if task.remaining_seconds <= 0:
+            result_text = result or "Ciclo concluído sem texto de resposta."
+            marker = "[CONTINUAR]"
+            if result_text.startswith("[TRABALHO_CONCLUIDO]"):
+                marker = "[TRABALHO_CONCLUIDO]"
                 task.status = "completed"
-                task.result = (result or "")[:12000]
+            elif result_text.startswith("[TRABALHO_BLOQUEADO]"):
+                marker = "[TRABALHO_BLOQUEADO]"
+                task.status = "paused"
+            elif result_text.startswith("[CONTINUAR]"):
+                marker = "[CONTINUAR]"
+            result_text = result_text[len(marker):].lstrip()
+            task.progress = (result_text or "Ciclo concluído.")[:1200]
+            worker_db.add(Message(conversation_id=conversation_id, role="assistant", content=result_text or "Ciclo concluído sem texto de resposta."))
+            if marker == "[TRABALHO_CONCLUIDO]":
+                task.result = result_text[:12000]
+                task.progress = "Objetivo concluído. Resultado salvo na conversa."
+            elif marker == "[TRABALHO_BLOQUEADO]":
+                task.result = result_text[:12000]
+                task.progress = "Trabalho pausado por bloqueio. Consulte a última mensagem para ver o que falta."
+            elif task.remaining_seconds <= 0:
+                task.status = "completed"
+                task.result = result_text[:12000]
                 task.progress = "Tempo de trabalho concluído. Resultado salvo na conversa."
             worker_db.commit()
             rounds += 1
-            if task.status == "completed":
+            if task.status in {"completed", "paused", "cancelled"}:
                 break
             time.sleep(3)
         else:
