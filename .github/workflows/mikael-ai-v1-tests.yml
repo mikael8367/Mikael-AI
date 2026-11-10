@@ -25,5 +25,5 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run unit tests
         run: pytest -q
-      - name: Compile Python source
-        run: python -m py_compile mikael_ai_v1.py tests/test_model.py
+      - name: Compile all Python files
+        run: python -m py_compile mikael_ai_v1.py web_tools.py response_policy.py connectors.py coding_tools.py dataset_tools.py tests/test_model.py tests/test_web_tools.py tests/test_connectors_and_coding.py
