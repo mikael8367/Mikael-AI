@@ -1,0 +1,10 @@
+{
+  "name": "Mikael AI",
+  "short_name": "Mikael AI",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07110d",
+  "theme_color": "#07110d",
+  "lang": "pt-BR"
+}
