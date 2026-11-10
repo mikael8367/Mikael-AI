@@ -121,6 +121,8 @@ def web_search(body: SearchBody, _: None = Depends(require_auth)):
         return {"query": body.query, **result}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    except PermissionError:
+        raise HTTPException(403, "Não posso ajudar a pesquisar esse tema.")
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     except Exception as exc:
