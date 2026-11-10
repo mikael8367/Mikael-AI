@@ -497,8 +497,8 @@ def execute_connector_tool(name: str, arguments: dict, db):
             inputs = arguments.get("inputs") or {}
             if not all(isinstance(x, str) and x.strip() and len(x) < 200 for x in (owner, repo, workflow_id, ref)):
                 return {"error": "Owner, repositório, workflow ou ref inválidos."}
-            if not isinstance(inputs, dict) or len(inputs) > 20:
-                return {"error": "Inputs do workflow inválidos."}
+            if not isinstance(inputs, dict) or len(inputs) > 20 or any(not isinstance(k, str) or len(k) > 100 or not isinstance(v, str) or len(v) > 1000 for k, v in inputs.items()):
+                return {"error": "Inputs do workflow devem ser um objeto com até 20 pares de textos curtos."}
             payload = {"ref": ref, "inputs": inputs}
             url = "https://api.github.com/repos/%s/%s/actions/workflows/%s/dispatches" % (urllib.parse.quote(owner, safe=""), urllib.parse.quote(repo, safe=""), urllib.parse.quote(workflow_id, safe=""))
             _http_json(url, token, method="POST", payload=payload)
