@@ -10,11 +10,11 @@ Modelo experimental autoral com pesos inicializados aleatoriamente. Não usa pes
 
 ## Treinamento de programação
 O primeiro corpus autoral de programação em português está em:
-- data/programming_train.jsonl: 128 exemplos de treino.
-- data/programming_val.jsonl: 15 exemplos de validação.
-- data/programming_test.jsonl: 10 exemplos de teste isolado.
+- data/programming_train.jsonl: 384 exemplos de treino.
+- data/programming_val.jsonl: 25 exemplos de validação.
+- data/programming_test.jsonl: 18 exemplos de teste isolado.
 
-Abrange fundamentos de Python, JavaScript, HTML, CSS, Java, Kotlin, algoritmos, estruturas de dados, Git, APIs, segurança e depuração. Os exemplos foram escritos para caber no contexto atual de 256 bytes/tokens do tokenizador byte-level. O corpus é um primeiro ciclo didático e ainda é pequeno para produzir competência avançada; aumente-o com exemplos revisados e testes executáveis antes de alegar qualidade profissional.
+Abrange Java (80 exemplos), C++ (83), Python, JavaScript, Kotlin, C#, SQL, Git, HTML, CSS, algoritmos, estruturas de dados, APIs, segurança, testes e depuração. Os 128 exemplos anteriores cobrem fundamentos gerais. Os exemplos foram escritos para caber no contexto atual de 256 bytes/tokens do tokenizador byte-level. O corpus ainda é um primeiro ciclo didático e pequeno para produzir competência avançada ou profissional. É uma base para iniciar treino e medir erros; aumente para milhares de exemplos revisados e benchmarks executáveis.
 
 ### Treinar pelo celular com Google Colab
 Abra o notebook:
@@ -23,12 +23,12 @@ Mikael_AI_V1_Programacao_Colab.ipynb
 No Colab, selecione GPU quando disponível e execute as células em ordem. O notebook:
 1. Clona esta branch.
 2. Executa os testes e a compilação.
-3. Treina até 30 épocas, com early stopping pela validação.
+3. Treina até 100 épocas, com early stopping pela validação.
 4. Salva o melhor checkpoint e um relatório.
 5. Permite baixar os arquivos do treinamento.
 
 Comando equivalente:
-python sft_train.py --train data/programming_train.jsonl --val data/programming_val.jsonl --test data/programming_test.jsonl --epochs 30 --batch-size 8 --lr 0.0001 --patience 7 --output checkpoints/programming
+python sft_train.py --train data/programming_train.jsonl --val data/programming_val.jsonl --test data/programming_test.jsonl --epochs 100 --batch-size 8 --lr 0.00005 --patience 15 --min-delta 0.00001 --output checkpoints/programming
 
 O script salva o melhor checkpoint em checkpoints/programming/mikael-ai-v1-sft.pt e training_report.json. A avaliação de teste usa o checkpoint escolhido pela validação. Loss menor não garante código correto; revise e execute testes em ambiente isolado.
 
@@ -52,7 +52,7 @@ coding_tools.py verifica sintaxe Python com AST, sem executar o código. Para ou
 - Testar generalização em perguntas que não aparecem no treino.
 - Evoluir arquitetura e contexto depois de medir memória e desempenho.
 - Integrar o controlador de ferramentas, execução de testes segura e runtime Android.
-- O checkpoint treinado precisa ser convertido/adaptado para runtime Android; o protótipo Python ainda não roda diretamente no app.
+- O checkpoint treinado precisa ser convertido/adaptado para runtime Android; o protótipo Python ainda não roda diretamente no app. A quantidade atual de exemplos não torna o modelo equivalente a um LLM moderno; qualidade precisa ser medida em testes de código inéditos.
 
 ## Auditoria
 Rode pytest -q e:
