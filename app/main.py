@@ -472,7 +472,7 @@ def approve_action(action_id: int, _: None = Depends(require_auth), db: Session 
         connector = db.scalars(select(Connector).where(Connector.provider == "github")).first()
         if not connector:
             raise HTTPException(409, "GitHub foi desconectado. Conecte novamente antes de aprovar.")
-        token = decrypt_secret(connector.secret)
+        token = github_api_token(connector)
         base = "https://api.github.com/repos/%s/%s/contents/%s" % (
             urllib.parse.quote(args["owner"], safe=""),
             urllib.parse.quote(args["repo"], safe=""),
