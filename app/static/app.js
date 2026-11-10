@@ -152,7 +152,7 @@ async function startLongWork(goal,duration){
     workStatusReceivedAt=Date.now();renderLongWork(task);
     await loadConversations();
     await openConversation(task.conversation_id);
-    toast('Trabalho iniciado. Mantenha esta aba aberta para continuar.');
+    toast('Trabalho iniciado. Você pode minimizar o navegador; ative as notificações para receber avisos.');
   }catch(error){toast('Não foi possível iniciar: '+error.message)}
   finally{button.disabled=false}
 }
@@ -173,16 +173,6 @@ async function cancelLongWork(){
   try{const task=await api('/api/work/'+activeWorkTask.id+'/cancel',{method:'POST'});workStatusReceivedAt=Date.now();renderLongWork(task);toast('Tarefa cancelada.')}
   catch(error){toast('Não foi possível cancelar: '+error.message)}
 }
-function pauseWorkWhenHidden(){
-  if(!activeWorkTask||activeWorkTask.status!=='running')return;
-  const id=activeWorkTask.id;
-  activeWorkTask.status='paused';
-  renderLongWork(activeWorkTask);
-  fetch('/api/work/'+id+'/pause',{method:'POST',credentials:'same-origin',keepalive:true})
-    .then(async response=>{if(response.ok){const task=await response.json();workStatusReceivedAt=Date.now();renderLongWork(task)}})
-    .catch(()=>{});
-}
-
 async function send(){
   const input=$('prompt'),text=input.value.trim();
   if(!text||isSending)return;
@@ -371,7 +361,41 @@ async function addMcpConnector(){
   }catch(e){toast('Não foi possível conectar: '+e.message)}
   finally{button.disabled=false;button.textContent='Testar e adicionar MCP'}
 }
-async function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels();await loadPendingApprovals();const params=new URLSearchParams(location.search);if(params.get('connector')==='github_connected'){toast('GitHub conectado com sucesso!');showTab('settings')}else if(params.has('connector_error')){toast('Não foi possível conectar o GitHub. Confira a configuração OAuth.');showTab('settings')}if(params.has('connector')||params.has('connector_error'))history.replaceState({},'',location.pathname)}catch{$('login').classList.remove('hidden')}}
+async 
+function base64UrlToBytes(value){
+  const padded=(value+'='.repeat((4-value.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(padded);return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function enableWorkNotifications(){
+  const button=$('enableWorkNotifications');
+  button.disabled=true;
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
+      throw new Error('Este navegador não oferece notificações push. Use Chrome atualizado no Android.');
+    }
+    const permission=Notification.permission==='granted'? 'granted':await Notification.requestPermission();
+    if(permission!=='granted')throw new Error('Permissão de notificações não concedida.');
+    const config=await api('/api/push/public-key');
+    const registration=await navigator.serviceWorker.register('/sw.js',{scope:'/'});
+    await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription){
+      subscription=await registration.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:base64UrlToBytes(config.public_key)
+      });
+    }
+    await api('/api/push/subscribe',{method:'POST',body:JSON.stringify(subscription.toJSON())});
+    $('notificationStatus').textContent='Notificações ativadas. Você receberá avisos quando o trabalho terminar ou for pausado.';
+    button.textContent='Notificações ativadas';
+    toast('Notificações ativadas com sucesso.');
+  }catch(error){
+    $('notificationStatus').textContent=error.message;
+    toast('Não foi possível ativar notificações: '+error.message);
+  }finally{button.disabled=false}
+}
+
+function boot(){try{await api('/api/me');$('login').classList.add('hidden');$('app').classList.remove('hidden');try{const saved=localStorage.getItem('mikael_selected_model');if(['mikael','deepseek','gpt4o_mini'].includes(saved))selectedModel=saved}catch{}$('modelSelect').value=selectedModel;await loadModels();await loadPendingApprovals();const params=new URLSearchParams(location.search);if(params.get('connector')==='github_connected'){toast('GitHub conectado com sucesso!');showTab('settings')}else if(params.has('connector_error')){toast('Não foi possível conectar o GitHub. Confira a configuração OAuth.');showTab('settings')}if(params.has('connector')||params.has('connector_error'))history.replaceState({},'',location.pathname)}catch{$('login').classList.remove('hidden')}}
 async function loadModels(){try{const models=await api('/api/models');const select=$('modelSelect');if(!Array.isArray(models)||!models.some(m=>m.id==='mikael'))throw new Error('Lista de modelos inválida.');select.innerHTML='';models.forEach(model=>{const option=document.createElement('option');option.value=model.id;option.textContent=model.name;option.title=model.description||'';select.append(option)});if(!models.some(m=>m.id===selectedModel))selectedModel='mikael';select.value=selectedModel}catch(error){toast('Não foi possível carregar os modelos: '+error.message)}}
 $('approvalAllow').onclick=()=>closeApproval(true);
 $('approvalDeny').onclick=()=>closeApproval(false);
@@ -462,9 +486,8 @@ async function handleChatFiles(event){
   await loadFiles();
 }
 $('sendBtn').onclick=send;$('startLongWork').onclick=()=>startLongWork($('workGoal').value,$('workDuration').value);
-$('pauseLongWork').onclick=pauseLongWork;$('resumeLongWork').onclick=resumeLongWork;$('cancelLongWork').onclick=cancelLongWork;
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')pauseWorkWhenHidden()});
-window.addEventListener('pagehide',pauseWorkWhenHidden);
+$('pauseLongWork').onclick=pauseLongWork;$('resumeLongWork').onclick=resumeLongWork;$('cancelLongWork').onclick=cancelLongWork;$('enableWorkNotifications').onclick=enableWorkNotifications;
+
 $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 $('attachBtn').onclick=()=>{if(!isSending&&!isGeneratingImage)$('chatFileInput').click()};
 $('imageGenBtn').onclick=generateChatImage;
