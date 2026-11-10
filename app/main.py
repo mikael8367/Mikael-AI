@@ -15,7 +15,7 @@ from .db import Base, engine, get_db, SessionLocal
 from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction, WorkTask, PushSubscription
 from .security import make_session, require_auth
 from .llm import answer, answer_with_image, generate_image
-from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
+from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog, github_installation_token, github_app_jwt, github_connector_data, github_oauth_token, github_api_token)
 
 APP_VERSION = "1.16.0"
 
@@ -228,10 +228,21 @@ def github_permissions(_: None = Depends(require_auth), db: Session = Depends(ge
     if not connector:
         raise HTTPException(404, "Nenhuma conta GitHub está conectada.")
     try:
-        report = github_permission_report(decrypt_secret(connector.secret))
+        if github_connector_data(connector).get("installation_id"):
+            token = github_api_token(connector)
+            installed = _http_json("https://api.github.com/installation/repositories?per_page=100", token)
+            report = {
+                "account": connector.account, "scope_status": "installation",
+                "oauth_scopes": None, "scope_header_available": False,
+                "installed_repository_count": len(installed.get("repositories") or []) if isinstance(installed, dict) else 0,
+                "installation_permissions": github_connector_data(connector).get("permissions", {}),
+                "checked_at": int(time.time()),
+            }
+        else:
+            report = github_permission_report(github_oauth_token(connector))
     except Exception as exc:
         logging.warning("Falha ao consultar permissões GitHub (%s)", type(exc).__name__)
-        raise HTTPException(502, str(exc)[:220])
+        raise HTTPException(502, "Não foi possível validar a instalação GitHub. Confira a chave privada e as permissões no GitHub.")
     report.update({
         "connected": True,
         "enabled": bool(connector.enabled),
@@ -247,6 +258,64 @@ def github_permissions(_: None = Depends(require_auth), db: Session = Depends(ge
         "scope_notice": "Os escopos OAuth representam a autorização concedida ao aplicativo. Eles não são uma lista de botões/ferramentas da Mikael AI. O escopo repo é amplo; a interface expõe somente as ferramentas listadas acima.",
     })
     return report
+
+
+@app.get("/api/connectors/github/install")
+def github_app_install(_: None = Depends(require_auth)):
+    from itsdangerous import URLSafeTimedSerializer
+    slug = (os.getenv("GITHUB_APP_SLUG") or "mikael-ai-assistant").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9-]{1,100}", slug):
+        raise HTTPException(503, "GITHUB_APP_SLUG inválido no Render.")
+    if not (os.getenv("GITHUB_APP_ID") or "").strip() or not (os.getenv("GITHUB_PRIVATE_KEY") or "").strip():
+        raise HTTPException(503, "Configure GITHUB_APP_ID e GITHUB_PRIVATE_KEY no Render.")
+    state = URLSafeTimedSerializer(os.getenv("APP_SECRET"), salt="mikael-github-app-install").dumps({"nonce": os.urandom(24).hex()})
+    url = "https://github.com/apps/%s/installations/new?state=%s" % (slug, urllib.parse.quote(state, safe=""))
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie("mikael_github_install_state", state, httponly=True, secure=True, samesite="lax", max_age=900, path="/")
+    return response
+
+
+@app.get("/api/connectors/github/setup")
+def github_app_setup(request: Request, installation_id: str = "", setup_action: str = "", state: str = "", db: Session = Depends(get_db)):
+    from itsdangerous import URLSafeTimedSerializer
+    response = RedirectResponse("/?connector_error=github_install_failed", status_code=303)
+    response.delete_cookie("mikael_github_install_state", path="/")
+    cookie_state = request.cookies.get("mikael_github_install_state", "")
+    if not installation_id.isdigit() or not cookie_state or not state or state != cookie_state:
+        return response
+    try:
+        URLSafeTimedSerializer(os.getenv("APP_SECRET"), salt="mikael-github-app-install").loads(state, max_age=900)
+        jwt = github_app_jwt()
+        installation = _http_json("https://api.github.com/app/installations/" + installation_id, jwt)
+        if str(installation.get("app_id") or "") != str(os.getenv("GITHUB_APP_ID") or "").strip():
+            raise RuntimeError("A instalação recebida não pertence à Mikael AI Assistant.")
+        token = github_installation_token(installation_id)
+        repositories = _http_json("https://api.github.com/installation/repositories?per_page=100", token)
+        account_data = installation.get("account") or {}
+        metadata = {
+            "installation_id": installation_id,
+            "account_type": str(account_data.get("type") or ""),
+            "repository_selection": str(installation.get("repository_selection") or ""),
+            "repository_count": len(repositories.get("repositories") or []) if isinstance(repositories, dict) else 0,
+            "permissions": installation.get("permissions") or {},
+        }
+        login_name = str(account_data.get("login") or "GitHub")
+        existing = db.scalars(select(Connector).where(Connector.provider == "github")).first()
+        if existing:
+            existing.endpoint = json.dumps(metadata, ensure_ascii=False)
+            existing.account = login_name
+            existing.name = "GitHub App"
+            existing.enabled = True
+            existing.avatar_url = ""
+        else:
+            db.add(Connector(provider="github", name="GitHub App", account=login_name,
+                             endpoint=json.dumps(metadata, ensure_ascii=False), secret=encrypt_secret("")))
+        db.commit()
+        response = RedirectResponse("/?connector=github_connected", status_code=303)
+    except Exception as exc:
+        logging.error("Falha na instalação GitHub App (%s)", type(exc).__name__)
+    response.delete_cookie("mikael_github_install_state", path="/")
+    return response
 
 
 @app.get("/api/connectors/github/start")
@@ -341,10 +410,14 @@ def test_connector(connector_id: int, _: None = Depends(require_auth), db: Sessi
     if item.provider == "github":
         from .connectors import _http_json, decrypt_secret
         try:
-            account = _http_json("https://api.github.com/user", decrypt_secret(item.secret))
+            if github_connector_data(item).get("installation_id"):
+                token = github_api_token(item)
+                result = _http_json("https://api.github.com/installation/repositories?per_page=100", token)
+                return {"ok": True, "account": item.account, "repositories": len(result.get("repositories") or [])}
+            account = _http_json("https://api.github.com/user", github_oauth_token(item))
             return {"ok": True, "account": account.get("login", item.account)}
         except Exception:
-            raise HTTPException(502, "Não foi possível validar a conexão GitHub. Talvez a autorização tenha sido revogada.")
+            raise HTTPException(502, "Não foi possível validar a instalação GitHub. Confira as permissões e a chave privada.")
     try:
         tools = mcp_test(item.endpoint, decrypt_secret(item.secret) if item.secret else None)
     except Exception as exc:
