@@ -498,4 +498,4 @@ $('generateFile').onclick=generateFile;$('fileInput').onchange=async e=>{const s
 $('saveMemory').onclick=async()=>{const content=$('memoryText').value.trim();if(!content)return;try{await api('/api/memories',{method:'POST',body:JSON.stringify({content,category:'projeto'})});$('memoryText').value='';toast('Memória salva');loadMemories()}catch(e){toast(e.message)}};
 boot();
 refreshLongWork();
-workPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshLongWork()},6000);
+workPollTimer=setInterval(()=>refreshLongWork(),15000);
