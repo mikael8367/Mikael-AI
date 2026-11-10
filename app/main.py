@@ -14,7 +14,7 @@ from docx import Document
 from .db import Base, engine, get_db, SessionLocal
 from .models import Conversation, Message, Memory, UploadedFile, Connector, PendingAction, WorkTask
 from .security import make_session, require_auth
-from .llm import answer, answer_with_image, generate_image
+from .llm import answer, answer_with_image, generate_image, search_web
 from .connectors import (encrypt_secret, decrypt_secret, _http_json, validate_mcp_endpoint, mcp_test, github_exchange_code, connector_tools, execute_connector_tool, normalize_mcp_name, ensure_connector_enabled, github_permission_report, connector_tool_catalog)
 
 APP_VERSION = "1.15.0"
@@ -43,6 +43,10 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 class LoginBody(BaseModel):
     password: str = Field(min_length=1, max_length=256)
+
+
+class SearchBody(BaseModel):
+    query: str = Field(min_length=2, max_length=500)
 
 
 class ChatBody(BaseModel):
@@ -107,6 +111,21 @@ def logout(response: Response, _: None = Depends(require_auth)):
 @app.get("/api/me")
 def me(_: None = Depends(require_auth)):
     return {"name": "Mikael AI", "authenticated": True}
+
+
+@app.post("/api/search")
+def web_search(body: SearchBody, _: None = Depends(require_auth)):
+    """Search only the explicit query; do not load or transmit chat history, memories or files."""
+    try:
+        result = search_web(body.query)
+        return {"query": body.query, **result}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    except Exception as exc:
+        logging.error("Falha na pesquisa web (%s)", type(exc).__name__)
+        raise HTTPException(502, "Falha ao pesquisar na web. Verifique a configuração do provedor no Render.")
 
 
 @app.post("/api/conversations")
