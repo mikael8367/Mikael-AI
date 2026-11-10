@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#07110d"><title>Mikael AI</title>
+<meta name="theme-color" content="#07110d"><link rel="manifest" href="/manifest.webmanifest"><title>Mikael AI</title>
 <link rel="stylesheet" href="/static/style.css?v=__APP_VERSION__">
 </head>
 <body>
@@ -33,14 +33,15 @@
       <div id="messages" class="messages"><div class="welcome-msg">Sua próxima ideia começa aqui.<br><small>Descreva o que você quer programar.</small></div></div>
       <div id="workStatus" class="work-status hidden" aria-live="polite"></div>
       <section id="longWorkPanel" class="long-work-panel" aria-label="Trabalho prolongado">
-        <div class="long-work-heading"><b>Trabalho prolongado</b><small>Peça à Mikael AI para trabalhar por até 3 horas. Se a aba for suspensa, o trabalho será pausado e poderá ser retomado.</small></div>
+        <div class="long-work-heading"><b>Trabalho prolongado</b><small>Peça à Mikael AI para trabalhar pelo tempo escolhido. Você pode minimizar o navegador; as notificações avisam quando houver atualização ou conclusão.</small></div>
         <textarea id="workGoal" rows="2" maxlength="12000" placeholder="Descreva o projeto e o que a IA deve fazer..."></textarea>
         <div class="long-work-controls">
           <select id="workDuration" aria-label="Duração do trabalho">
             <option value="1800">30 minutos</option><option value="3600">1 hora</option><option value="7200">2 horas</option><option value="10800" selected>3 horas</option>
           </select>
           <button id="startLongWork" class="primary" type="button">Iniciar trabalho</button>
-        </div>
+        <button id="enableWorkNotifications" class="outline" type="button">Ativar notificações</button>
+        <small id="notificationStatus" class="connector-note">Ative para receber avisos mesmo com a página em segundo plano.</small>
         <div id="longWorkStatus" class="long-work-status hidden" aria-live="polite">
           <b id="longWorkState">Preparando...</b><span id="longWorkTime">Tempo restante: --</span>
           <p id="longWorkProgress"></p>
