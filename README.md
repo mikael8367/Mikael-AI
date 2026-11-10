@@ -66,7 +66,7 @@ Se você já conectou o GitHub antes da versão 1.9.0, desconecte e conecte nova
 
 Na lista de conectores, abra **O que a Mikael AI pode fazer** para habilitar ou desabilitar cada ferramenta. A opção **Desabilitar** pausa o conector inteiro; as caixas de seleção controlam as ferramentas individualmente. Os servidores MCP continuam limitados a ferramentas que passam pelo filtro de leitura segura do projeto; ferramentas MCP com efeitos colaterais não são liberadas automaticamente.
 
-O GitHub oferece pesquisa de código, leitura de arquivos, listagem de repositórios/branches/issues/pull requests, criação de branches, criação/edição de arquivos de texto, upload binário até 5 MB, criação de issues, comentários e pull requests, consulta de GitHub Actions e disparo de workflows manuais. A criação/edição de arquivos gera commits. A exclusão de arquivo exige aprovação separada. A Mikael AI não solicita escopos OAuth de administração de organização, exclusão de repositório ou administração de webhooks/secrets.
+O GitHub oferece pesquisa de código, leitura de arquivos, listagem de repositórios/branches/issues/pull requests, criação de branches, criação/edição de arquivos de texto, upload binário até 700 KB, criação de issues, comentários e pull requests, consulta de GitHub Actions e disparo de workflows manuais. A criação/edição de arquivos gera commits. A exclusão de arquivo exige aprovação separada. A Mikael AI não solicita escopos OAuth de administração de organização, exclusão de repositório ou administração de webhooks/secrets.
 
 ### Ferramentas de arquivos da Mikael AI
 
