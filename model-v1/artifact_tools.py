@@ -70,7 +70,7 @@ class ArtifactManager:
     def _validate_filename(filename, allowed):
         if not isinstance(filename, str) or not filename.strip():
             raise ArtifactError("Informe um nome de arquivo.")
-        if len(filename) > 120 or "/" in filename or "\\\\" in filename:
+        if len(filename) > 120 or "/" in filename or "\\" in filename:
             raise ArtifactError("Nome de arquivo inválido.")
         name = Path(filename).name
         if name in ("", ".", "..") or name != filename:
