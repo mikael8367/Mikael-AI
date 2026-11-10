@@ -121,6 +121,67 @@ def _append_web_citations(message):
     return content
 
 
+def _extract_web_sources(message):
+    """Return only validated HTTP(S) citations supplied by the web-search provider."""
+    payload = message.model_dump() if hasattr(message, "model_dump") else {}
+    annotations = payload.get("annotations") or []
+    sources = []
+    seen = set()
+    for annotation in annotations:
+        citation = (annotation or {}).get("url_citation") or {}
+        url = citation.get("url")
+        title = citation.get("title") or url
+        if not isinstance(url, str):
+            continue
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        sources.append({"title": str(title or url)[:180], "url": url})
+    return sources[:10]
+
+
+def search_web(query):
+    """Search the web using only the supplied query; no chat history or files are accepted."""
+    query = str(query or "").strip()
+    if not query or len(query) > 500:
+        raise ValueError("A pesquisa precisa ter entre 1 e 500 caracteres.")
+    tools = _web_search_tools()
+    if not tools:
+        raise RuntimeError("A pesquisa web está desativada ou não está disponível neste provedor.")
+    model = (os.getenv("LLM_WEB_SEARCH_MODEL") or os.getenv("LLM_MODEL") or "deepseek/deepseek-v4.1-flash").strip()
+    response = get_client().chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Pesquise na web usando a ferramenta de pesquisa disponível. "
+                    "Resuma os resultados em português brasileiro, diferencie fatos de incertezas "
+                    "e não invente fontes. A mensagem do usuário contém apenas a consulta de pesquisa."
+                ),
+            },
+            {"role": "user", "content": query},
+        ],
+        tools=tools,
+        temperature=0.1,
+    )
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        raise RuntimeError("O provedor de pesquisa não retornou resultados.")
+    message = choices[0].message
+    sources = _extract_web_sources(message)
+    if not sources:
+        raise RuntimeError("A pesquisa não retornou fontes verificáveis; nenhum resultado foi apresentado como confirmado.")
+    return {
+        "summary": message.content or "A pesquisa encontrou fontes, mas não retornou um resumo.",
+        "sources": sources,
+        "provider": "OpenRouter + " + (os.getenv("LLM_WEB_SEARCH_ENGINE") or "exa").strip().lower(),
+    }
+
+
 MODEL_PRESETS = {
     "mikael": None,
     "deepseek": "deepseek/deepseek-v4.1-flash",
