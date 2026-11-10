@@ -37,8 +37,6 @@ services:
         sync: false
       - key: GITHUB_PRIVATE_KEY
         sync: false
-      - key: GITHUB_APP_SLUG
-        value: mikael-ai-assistant
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET
