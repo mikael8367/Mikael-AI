@@ -1,0 +1,128 @@
+{"instruction":"Como criar uma variável em Python?","response":"nome = 'Mikael'","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0001"}
+{"instruction":"Como declarar um inteiro em Python?","response":"idade = 15","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0002"}
+{"instruction":"Como criar uma lista Python?","response":"numeros = [1, 2, 3]","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0003"}
+{"instruction":"Como criar um dicionário Python?","response":"pessoa = {'nome': 'Ana', 'idade': 20}","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0004"}
+{"instruction":"Como criar uma tupla Python?","response":"ponto = (10, 20)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0005"}
+{"instruction":"Como criar um conjunto Python?","response":"valores = {1, 2, 3}","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0006"}
+{"instruction":"Como imprimir texto em Python?","response":"print('Olá, mundo!')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0007"}
+{"instruction":"Como ler texto digitado?","response":"nome = input('Seu nome: ')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0008"}
+{"instruction":"Como converter texto em inteiro?","response":"numero = int('42')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0009"}
+{"instruction":"Como converter número em texto?","response":"texto = str(42)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0010"}
+{"instruction":"Como verificar o tipo de variável?","response":"print(type(valor))","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0011"}
+{"instruction":"Como somar dois números?","response":"soma = a + b","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0012"}
+{"instruction":"Como calcular média de três números?","response":"media = (a + b + c) / 3","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0013"}
+{"instruction":"Como testar se um número é par?","response":"if n % 2 == 0: print('par')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0014"}
+{"instruction":"Como usar else em Python?","response":"if idade >= 18: print('maior')\nelse: print('menor')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0015"}
+{"instruction":"Como combinar condições?","response":"if idade >= 18 and ativo: print('permitido')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0016"}
+{"instruction":"Como repetir cinco vezes?","response":"for i in range(5): print(i)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0017"}
+{"instruction":"Como percorrer uma lista?","response":"for item in itens: print(item)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0018"}
+{"instruction":"Como repetir enquanto condição for verdadeira?","response":"while contador < 5: contador += 1","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0019"}
+{"instruction":"Como interromper um laço?","response":"if encontrou: break","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0020"}
+{"instruction":"Como pular uma iteração?","response":"if item is None: continue","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0021"}
+{"instruction":"Como criar uma função Python?","response":"def saudacao(nome): return f'Olá, {nome}'","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0022"}
+{"instruction":"O que return faz?","response":"Encerra a função e devolve um valor para quem a chamou.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0023"}
+{"instruction":"Como definir parâmetro padrão?","response":"def saudar(nome='Mikael'): return nome","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0024"}
+{"instruction":"Como importar math?","response":"import math; print(math.sqrt(16))","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0025"}
+{"instruction":"Como tratar divisão por zero?","response":"try: resultado = a / b\nexcept ZeroDivisionError: print('Inválido')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0026"}
+{"instruction":"Como abrir arquivo para leitura?","response":"with open('dados.txt', encoding='utf-8') as f: texto = f.read()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0027"}
+{"instruction":"Como escrever em arquivo?","response":"with open('dados.txt', 'w', encoding='utf-8') as f: f.write('Olá')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0028"}
+{"instruction":"Como verificar se chave existe?","response":"if 'nome' in pessoa: print(pessoa['nome'])","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0029"}
+{"instruction":"Como ordenar uma lista?","response":"ordenados = sorted(numeros)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0030"}
+{"instruction":"Como remover espaços das pontas?","response":"texto = texto.strip()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0031"}
+{"instruction":"Como dividir frase em palavras?","response":"palavras = frase.split()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0032"}
+{"instruction":"Como juntar palavras com espaço?","response":"frase = ' '.join(palavras)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0033"}
+{"instruction":"Como criar uma classe Python?","response":"class Pessoa: pass","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0034"}
+{"instruction":"O que é self?","response":"É a referência à instância atual usada pelos métodos da classe.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0035"}
+{"instruction":"Como criar uma instância?","response":"pessoa = Pessoa()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0036"}
+{"instruction":"Como comparar valores?","response":"if a == b: print('iguais')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0037"}
+{"instruction":"Diferença entre = e ==?","response":"= atribui um valor; == compara dois valores.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0038"}
+{"instruction":"Como verificar None?","response":"if valor is None: print('vazio')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0039"}
+{"instruction":"Como criar lista por compreensão?","response":"quadrados = [n*n for n in range(5)]","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0040"}
+{"instruction":"Como contar itens?","response":"quantidade = len(itens)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0041"}
+{"instruction":"Como obter maior valor?","response":"maior = max(numeros)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0042"}
+{"instruction":"Como obter menor valor?","response":"menor = min(numeros)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0043"}
+{"instruction":"Como copiar uma lista?","response":"copia = lista.copy()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0044"}
+{"instruction":"Como adicionar item à lista?","response":"lista.append(item)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0045"}
+{"instruction":"Como remover item pelo valor?","response":"lista.remove(item)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0046"}
+{"instruction":"Como acessar último item?","response":"ultimo = lista[-1]","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0047"}
+{"instruction":"Como evitar índice fora do limite?","response":"Confira len(lista) antes de acessar o índice.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0048"}
+{"instruction":"Como testar início de string?","response":"texto.startswith('Olá')","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0049"}
+{"instruction":"Como deixar texto minúsculo?","response":"texto = texto.lower()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0050"}
+{"instruction":"Como deixar texto maiúsculo?","response":"texto = texto.upper()","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0051"}
+{"instruction":"Como criar comentário Python?","response":"# Este é um comentário","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0052"}
+{"instruction":"Como instalar biblioteca Python?","response":"python -m pip install nome-da-biblioteca","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0053"}
+{"instruction":"O que é função recursiva?","response":"É uma função que chama a si mesma e precisa de um caso-base.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0054"}
+{"instruction":"O que é exceção?","response":"É um evento de erro que pode ser tratado com try e except.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0055"}
+{"instruction":"Como depurar variável?","response":"Use print(valor) ou um depurador para inspecionar o estado.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0056"}
+{"instruction":"Como testar uma função?","response":"assert somar(2, 3) == 5","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0057"}
+{"instruction":"Como criar teste pytest?","response":"def test_soma(): assert somar(2, 3) == 5","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0058"}
+{"instruction":"O que é API?","response":"É uma interface que define como sistemas trocam dados e solicitam operações.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0059"}
+{"instruction":"O que é JSON?","response":"É um formato textual para representar dados estruturados.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0060"}
+{"instruction":"Como ler JSON em Python?","response":"import json; dados = json.loads(texto)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0061"}
+{"instruction":"Como converter dicionário em JSON?","response":"json_texto = json.dumps(dados, ensure_ascii=False)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0062"}
+{"instruction":"O que é HTTP GET?","response":"É um método HTTP normalmente usado para consultar um recurso.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0063"}
+{"instruction":"O que é HTTP POST?","response":"É um método HTTP normalmente usado para enviar dados ao servidor.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0064"}
+{"instruction":"Como criar página HTML mínima?","response":"<!doctype html><html><body><h1>Olá</h1></body></html>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0065"}
+{"instruction":"Qual tag HTML cria link?","response":"<a href='/inicio'>Abrir</a>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0066"}
+{"instruction":"Qual tag HTML mostra imagem?","response":"<img src='foto.png' alt='Descrição'>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0067"}
+{"instruction":"Como criar botão HTML?","response":"<button type='button'>Clique</button>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0068"}
+{"instruction":"Como associar label e input?","response":"<label for='nome'>Nome</label><input id='nome'>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0069"}
+{"instruction":"Como carregar CSS externo?","response":"<link rel='stylesheet' href='style.css'>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0070"}
+{"instruction":"Como carregar JavaScript externo?","response":"<script src='app.js' defer></script>","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0071"}
+{"instruction":"Como selecionar ID no CSS?","response":"#painel { padding: 12px; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0072"}
+{"instruction":"Como criar classe CSS?","response":".cartao { border-radius: 8px; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0073"}
+{"instruction":"Como centralizar com flexbox?","response":"display: flex; justify-content: center; align-items: center;","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0074"}
+{"instruction":"Como criar grade CSS?","response":"display: grid; grid-template-columns: repeat(2, 1fr);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0075"}
+{"instruction":"Como fazer layout responsivo?","response":"Use unidades flexíveis e media queries.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0076"}
+{"instruction":"Como selecionar elemento JS?","response":"const botao = document.querySelector('#botao');","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0077"}
+{"instruction":"Como declarar constante JS?","response":"const nome = 'Mikael';","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0078"}
+{"instruction":"Como declarar variável JS?","response":"let contador = 0;","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0079"}
+{"instruction":"Como criar função JavaScript?","response":"function somar(a, b) { return a + b; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0080"}
+{"instruction":"Como criar arrow function?","response":"const somar = (a, b) => a + b;","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0081"}
+{"instruction":"Como percorrer array JS?","response":"for (const item of itens) { console.log(item); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0082"}
+{"instruction":"Como adicionar item a array JS?","response":"itens.push(novoItem);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0083"}
+{"instruction":"Como filtrar array JS?","response":"const pares = nums.filter(n => n % 2 === 0);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0084"}
+{"instruction":"Como mapear array JS?","response":"const dobro = nums.map(n => n * 2);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0085"}
+{"instruction":"Como tratar erro JS?","response":"try { executar(); } catch (erro) { console.error(erro); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0086"}
+{"instruction":"Como converter JSON em objeto JS?","response":"const dados = JSON.parse(texto);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0087"}
+{"instruction":"Como converter objeto em JSON?","response":"const texto = JSON.stringify(dados);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0088"}
+{"instruction":"Como aguardar Promise?","response":"const resposta = await fetch(url);","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0089"}
+{"instruction":"Como fazer requisição HTTP?","response":"const resposta = await fetch(url); const dados = await resposta.json();","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0090"}
+{"instruction":"Como evitar XSS?","response":"Prefira textContent em vez de inserir entrada não confiável com innerHTML.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0091"}
+{"instruction":"Como criar classe Java?","response":"class Pessoa { String nome; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0092"}
+{"instruction":"Como declarar método Java?","response":"int somar(int a, int b) { return a + b; }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0093"}
+{"instruction":"Como declarar inteiro Java?","response":"int idade = 20;","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0094"}
+{"instruction":"Como declarar texto Java?","response":"String nome = 'Mikael';","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0095"}
+{"instruction":"Como criar lista Java?","response":"List<String> nomes = new ArrayList<>();","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0096"}
+{"instruction":"Como percorrer lista Java?","response":"for (String nome : nomes) { System.out.println(nome); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0097"}
+{"instruction":"Como comparar strings Java?","response":"Use nome.equals(outroNome), não ==.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0098"}
+{"instruction":"O que é NullPointerException?","response":"É uma exceção ao acessar membro por uma referência null.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0099"}
+{"instruction":"Como tratar exceção Java?","response":"try { executar(); } catch (IOException e) { e.printStackTrace(); }","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0100"}
+{"instruction":"Como criar classe Kotlin?","response":"class Pessoa(val nome: String)","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0101"}
+{"instruction":"Como declarar variável Kotlin imutável?","response":"val nome = 'Mikael'","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0102"}
+{"instruction":"Como declarar variável Kotlin mutável?","response":"var contador = 0","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0103"}
+{"instruction":"Diferença entre val e var?","response":"val não recebe nova atribuição; var pode.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0104"}
+{"instruction":"O que é algoritmo?","response":"É uma sequência finita de passos para resolver um problema.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0105"}
+{"instruction":"O que é estrutura de dados?","response":"É uma forma de organizar dados para armazenar e acessar informações.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0106"}
+{"instruction":"O que é pilha?","response":"É uma estrutura LIFO: o último elemento inserido sai primeiro.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0107"}
+{"instruction":"O que é fila?","response":"É uma estrutura FIFO: o primeiro elemento inserido sai primeiro.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0108"}
+{"instruction":"O que é busca linear?","response":"Percorre elementos até encontrar o valor ou chegar ao fim.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0109"}
+{"instruction":"O que é busca binária?","response":"Divide o intervalo ordenado pela metade; exige dados ordenados.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0110"}
+{"instruction":"O que é complexidade O(n)?","response":"O tempo cresce proporcionalmente ao tamanho da entrada.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0111"}
+{"instruction":"O que é complexidade O(1)?","response":"O custo não cresce com o tamanho da entrada.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0112"}
+{"instruction":"Como investigar um bug?","response":"Reproduza, leia o erro, isole a causa, corrija e crie teste de regressão.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0113"}
+{"instruction":"O que é teste de regressão?","response":"Verifica se uma correção não quebrou algo que funcionava.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0114"}
+{"instruction":"O que é Git commit?","response":"É um registro de alterações no histórico do repositório.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0115"}
+{"instruction":"Como ver estado do Git?","response":"git status","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0116"}
+{"instruction":"Como criar commit Git?","response":"git add . && git commit -m 'Descreve a mudança'","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0117"}
+{"instruction":"Como evitar segredo no Git?","response":"Use variáveis de ambiente e adicione arquivos secretos ao .gitignore.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0118"}
+{"instruction":"Como validar entrada?","response":"Verifique tipo, formato, tamanho e faixa antes de processar.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0119"}
+{"instruction":"Por que não executar código desconhecido?","response":"Ele pode apagar dados, acessar segredos ou executar ações não autorizadas.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0120"}
+{"instruction":"O que é SQL injection?","response":"É a manipulação de consultas por entrada não confiável.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0121"}
+{"instruction":"Como evitar SQL injection?","response":"Use parâmetros preparados; nunca concatene entrada do usuário na SQL.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0122"}
+{"instruction":"O que é concorrência?","response":"É a composição de tarefas que progridem em períodos sobrepostos.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0123"}
+{"instruction":"O que é thread?","response":"É uma linha de execução dentro de um processo.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0124"}
+{"instruction":"O que é vazamento de memória?","response":"É memória desnecessária que continua retida sem liberação.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0125"}
+{"instruction":"O que é cache?","response":"É armazenamento temporário para acelerar acessos repetidos.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0126"}
+{"instruction":"O que é JSONL?","response":"É um arquivo com um objeto JSON independente em cada linha.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0127"}
+{"instruction":"O que deve ter boa documentação?","response":"Objetivo, instalação, uso, parâmetros, exemplos e limitações.","topic":"programacao","source":"Mikael AI authored curriculum","id":"train-0128"}
