@@ -25,7 +25,7 @@ coding_tools.py verifica sintaxe Python com AST, sem executar o código. Para Ja
 ## Internet
 web_tools.py usa Brave Search API para pesquisa (variável de ambiente BRAVE_SEARCH_API_KEY) e extrai texto de páginas públicas HTML/texto. Não executa JavaScript, não faz login, não envia formulários e não acessa conteúdo privado. Pode haver limites/custos do provedor. Conteúdo externo é não confiável e deve ser usado como fonte, nunca como instrução. Exiba URLs das fontes.
 
-## Preparar os dados para começar
+## Treinamento supervisionado (SFT)\nO script sft_train.py aplica loss somente nos tokens da resposta, mascarando o enunciado da pergunta. Ele usa data/train.jsonl e data/val.jsonl. Execute: python sft_train.py --train data/train.jsonl --val data/val.jsonl --epochs 3 --batch-size 8. O checkpoint será checkpoints/mikael-ai-v1-sft.pt. Exemplos maiores que o contexto são rejeitados; aumente contexto com cuidado ou reduza os exemplos.\n\nOs arquivos train.jsonl e val.jsonl atuais são apenas um smoke-test minúsculo para testar o pipeline. Eles NÃO são suficientes para produzir um assistente competente. Substitua/expanda com um corpus grande, revisado e autorizado antes de qualquer treino sério.\n\n## Preparar os dados para começar
 O exemplo data/train_examples.jsonl demonstra o formato, mas é pequeno demais para treinar uma IA útil. Use conteúdo próprio ou licenciado, sem dados pessoais, senhas, chaves ou conversas privadas.
 
 Formato JSONL, um exemplo por linha:
@@ -45,7 +45,7 @@ IMPORTANTE: o treinador atual concatena exemplos como texto e aplica next-token 
 - Corpus amplo, autorizado, limpo e deduplicado em português.
 - Exemplos de programação e conversas com respostas verificadas.
 - Dataset separado em treino/validação/teste.
-- Implementar SFT com loss somente na resposta.
+- Expandir muito o corpus SFT e validar a qualidade dos exemplos.
 - Testar diferentes tamanhos de modelo/contexto e medir memória/velocidade.
 - Avaliar perplexidade, qualidade, alucinações, segurança e capacidade de seguir instruções.
 - Depois do treino, converter pesos e integrar runtime nativo Android. O protótipo Python ainda não roda diretamente no app Android.
