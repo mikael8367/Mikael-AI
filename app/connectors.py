@@ -326,13 +326,19 @@ def execute_connector_tool(name: str, arguments: dict, db):
             return {"error": "O conector GitHub está desativado. Ative-o em Configurações para usar suas ferramentas."}
         if not _connector_tool_enabled(connector, name):
             return {"error": "Esta ferramenta está desabilitada nas permissões do conector GitHub."}
-        token = decrypt_secret(connector.secret)
+        token = github_api_token(connector)
         if name == "github_list_repositories":
             visibility = arguments.get("visibility", "all")
             if visibility not in {"all", "public", "private"}:
                 visibility = "all"
-            data = _http_json("https://api.github.com/user/repos?per_page=50&sort=updated&visibility=" + visibility, token)
-            return [{"full_name": x.get("full_name"), "private": x.get("private"), "description": x.get("description"), "url": x.get("html_url")} for x in data[:50]]
+            if github_connector_data(connector).get("installation_id"):
+                data = _http_json("https://api.github.com/installation/repositories?per_page=100", token)
+                repos = data.get("repositories", []) if isinstance(data, dict) else []
+                if visibility != "all":
+                    repos = [x for x in repos if (("public" if not x.get("private") else "private") == visibility)]
+            else:
+                repos = _http_json("https://api.github.com/user/repos?per_page=50&sort=updated&visibility=" + visibility, token)
+            return [{"full_name": x.get("full_name"), "private": x.get("private"), "description": x.get("description"), "url": x.get("html_url")} for x in repos[:100]]
         if name == "github_read_file":
             owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
             if not all(isinstance(x, str) and x and len(x) < 200 for x in (owner, repo, path)):
@@ -629,6 +635,74 @@ def execute_connector_tool(name: str, arguments: dict, db):
 
     return {"error": "Ferramenta desconhecida."}
 
+
+
+def _github_b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def github_app_jwt() -> str:
+    """Cria JWT RS256 curto para autenticar a GitHub App."""
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    app_id = (os.getenv("GITHUB_APP_ID") or "").strip()
+    pem = (os.getenv("GITHUB_PRIVATE_KEY") or "").strip().replace("\\n", "\n")
+    if not app_id or not pem:
+        raise RuntimeError("Configure GITHUB_APP_ID e GITHUB_PRIVATE_KEY no Render.")
+    now = int(time.time())
+    header = _github_b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+    claims = _github_b64url(json.dumps({"iat": now - 30, "exp": now + 8 * 60, "iss": app_id}).encode())
+    message = (header + "." + claims).encode("ascii")
+    try:
+        key = serialization.load_pem_private_key(pem.encode("utf-8"), password=None)
+        signature = key.sign(message, padding.PKCS1v15(), hashes.SHA256())
+    except Exception as exc:
+        raise RuntimeError("GITHUB_PRIVATE_KEY não contém uma chave PEM válida.") from exc
+    return header + "." + claims + "." + _github_b64url(signature)
+
+
+def github_installation_token(installation_id: str) -> str:
+    if not str(installation_id).isdigit():
+        raise RuntimeError("ID de instalação GitHub inválido.")
+    result = _http_json(
+        "https://api.github.com/app/installations/%s/access_tokens" % installation_id,
+        github_app_jwt(), method="POST", payload={}
+    )
+    token = result.get("token") if isinstance(result, dict) else None
+    if not isinstance(token, str) or not token:
+        raise RuntimeError("O GitHub não retornou um token de instalação.")
+    return token
+
+
+def github_connector_data(connector) -> dict:
+    try:
+        value = json.loads(connector.endpoint or "{}")
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def github_oauth_token(connector) -> str:
+    if not connector.secret:
+        return ""
+    raw = decrypt_secret(connector.secret)
+    try:
+        value = json.loads(raw)
+        if isinstance(value, dict):
+            return str(value.get("oauth_token") or "")
+    except Exception:
+        pass
+    return raw
+
+
+def github_api_token(connector) -> str:
+    installation_id = github_connector_data(connector).get("installation_id")
+    if installation_id:
+        return github_installation_token(str(installation_id))
+    token = github_oauth_token(connector)
+    if not token:
+        raise RuntimeError("GitHub ainda não foi instalado/conectado.")
+    return token
 
 def github_exchange_code(code: str, redirect_uri: str):
     client_id = (os.getenv("GITHUB_CLIENT_ID") or "").strip()
